@@ -2,9 +2,10 @@
 
 typedef enum {E_PARSE_OK} parse_error;
 
+// TODO: turn all arrays into vectors
 typedef struct {
   char* name;
-  expression* arguments;
+  vector_expression arguments;
   int arguments_count;
 } function_call;
 
@@ -62,7 +63,7 @@ parse_error parse(vector_char source, ast* out) {
   ast* program = malloc(sizeof(ast));
 
   vector_token tokens;
-  error = vector_token_init(tokens);
+  error = vector_token_init(&tokens);
   if (error != E_VECTOR_OK) {
     LOG_ERROR("vector", "Error during initialization", error);
     goto cleanup_init;
@@ -74,9 +75,11 @@ parse_error parse(vector_char source, ast* out) {
     goto cleanup_lex;
   }
 
+  function_declaration fd;
+  bool ok;
   while (true) {
-    if (function_declaration = parse_function(tokens)) {
-      
+    if (parse_function_declaration(&tokens)) {
+      program->declarations
     }
   }
 

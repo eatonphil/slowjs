@@ -9,7 +9,7 @@ typedef enum { false, true } bool;
 #include "interpret.c"
 
 int main(int argc, char **argv) {
-  int result;
+  int error = 0;
 
   if (argc !== 2) {
     printf("Expected a JavaScript file argument, got nothing.");
@@ -19,20 +19,20 @@ int main(int argc, char **argv) {
   vector_char source;
   int error = read_file(argv[1], &source);
   if (error != E_FILE_OK) {
-    result = error;
+    error = error;
     goto cleanup_file;
   }
 
   ast program;
   error = parse(source, &program);
   if (error != E_PARSE_OK) {
-    result = error;
+    error = error;
     goto cleanup_parse;
   }
 
-  error = interpret(program, &result);
+  error = interpret(program);
   if (error != E_INTERPRET_OK) {
-    result = error;
+    error = error;
     goto cleanup_interpret;
   }
 
@@ -40,5 +40,5 @@ int main(int argc, char **argv) {
  cleanup_parse:
   vector_char_free(&source);
  cleanup_file:
-  return result;
+  return error;
 }

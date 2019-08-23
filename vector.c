@@ -62,6 +62,10 @@ typedef enum {E_VECTOR_OK, E_VECTOR_INIT_ZERO, E_VECTOR_INIT_MALLOC, E_VECTOR_OU
     memcpy(v->elements, src, c);                                        \
   }                                                                     \
                                                                         \
+  vector_error vector_ ## t ## _shift(vector_ ## t* v) {                \
+    memcpy(v->elements, v->elements + 1, v->index--);                   \
+  }                                                                     \
+                                                                        \
   void vector_ ## t ## _free(vector *v) {                               \
     free(v->elements);                                                  \
     v->size = 0;                                                        \

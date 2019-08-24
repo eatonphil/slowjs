@@ -5,15 +5,13 @@
 
 #include "slowjs/vector.h"
 
-enum parse_error { E_PARSE_OK };
-typedef enum parse_error parse_error;
-
+struct declaration;
 struct expression;
 struct vector_expression;
 
 struct function_call {
-  struct expression function;
-  struct vector_expression arguments;
+  struct expression *function;
+  struct vector_expression *arguments;
 };
 typedef struct function_call function_call;
 
@@ -29,8 +27,8 @@ typedef enum operator_type operator_type;
 
 struct operator{
   operator_type type;
-  struct expression left_operand;
-  struct expression right_operand;
+  struct expression *left_operand;
+  struct expression *right_operand;
 };
 typedef struct operator operator;
 
@@ -81,7 +79,7 @@ struct statement {
   union {
     expression expression;
     expression ret;
-    declaration *declaration;
+    struct declaration *declaration;
   } statement;
 };
 typedef struct statement statement;
@@ -89,9 +87,6 @@ typedef struct statement statement;
 DECLARE_VECTOR(statement)
 
 void statement_free(statement *);
-
-typedef vector_char string;
-DECLARE_VECTOR(string)
 
 struct function_declaration {
   vector_char name;

@@ -1,19 +1,14 @@
-typedef enum { false, true } bool;
+#include <errno.h>
+#include <stdio.h>
 
-#define LOG_ERROR(triggering_module, msg, errno)                               \
-  fprintf(stderr, "[%s:%d] %s from %s: %d", __FILE__, __LINE__, msg,           \
-          triggering_module, errno)
-
-#include "file.c"
-#include "interpret.c"
-#include "lex.c"
-#include "parse.c"
-#include "vector.c"
+#include "slowjs/file.h"
+#include "slowjs/interpret.h"
+#include "slowjs/lex.h"
+#include "slowjs/parse.h"
+#include "slowjs/vector.h"
 
 int main(int argc, char **argv) {
-  int error = 0;
-
-  if (argc != = 2) {
+  if (argc != 2) {
     printf("Expected a JavaScript file argument, got nothing.");
     return 1;
   }

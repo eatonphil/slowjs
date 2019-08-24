@@ -1,8 +1,10 @@
 #include "slowjs/interpret.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "slowjs/ast.h"
+#include "slowjs/common.h"
 #include "slowjs/vector.h"
 
 struct vector_context;
@@ -43,7 +45,12 @@ interpret_error interpret_declaration(declaration, vector_context *);
 
 interpret_error interpret_function_call(function_call fc, vector_context *ctx,
                                         value *result) {
-  value function = interpret_expression(fc.function);
+  value function;
+  interpret_error error = interpret_expression(*fc.function, ctx, &function);
+  if (error != E_INTERPRET_OK) {
+    return E_INTERPRET_CRASH;
+  }
+
   if (function.type != VALUE_CLOSURE) {
     return E_INTERPRET_CALL_NONFUNCTION;
   }
@@ -56,12 +63,11 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
   int i;
   value v;
   vector_char p;
-  interpret_error error;
   context mapping;
   for (i = 0; i < function.value.closure.parameters.index; i++) {
     // TODO: guard against inequal number of arguments
     p = function.value.closure.parameters.elements[i];
-    error = interpret_expression(fc.arguments.elements[i], ctx, &v);
+    error = interpret_expression(fc.arguments->elements[i], ctx, &v);
     if (error != E_INTERPRET_OK) {
       return error;
     }
@@ -77,12 +83,12 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
 interpret_error interpret_operator(operator o, vector_context *ctx,
                                    value *result) {
   value left, right;
-  interpret_error error = interpret_expression(o.left_operand, ctx, &left);
+  interpret_error error = interpret_expression(*o.left_operand, ctx, &left);
   if (error != E_INTERPRET_OK) {
     return error;
   }
 
-  error = interpret_expression(o.right_operand, ctx, &right);
+  error = interpret_expression(*o.right_operand, ctx, &right);
   if (error != E_INTERPRET_OK) {
     return error;
   }
@@ -140,7 +146,7 @@ interpret_error interpret_statement(statement s, vector_context *ctx,
   case STATEMENT_EXPRESSION:
     return interpret_expression(s.statement.expression, ctx, &nothing);
   case STATEMENT_DECLARATION:
-    return interpret_declaration(s.statement.declaration, ctx);
+    return interpret_declaration(*s.statement.declaration, ctx);
   }
 }
 
@@ -150,7 +156,12 @@ interpret_error interpret_statements(vector_statement body, vector_context *ctx,
   interpret_error error;
   for (i = 0; i < body.index; i++) {
     error = interpret_statement(body.elements[i], ctx, result);
+    if (error != E_INTERPRET_OK) {
+      return error;
+    }
   }
+
+  return E_INTERPRET_OK;
 }
 
 interpret_error interpret_function_declaration(function_declaration fd,
@@ -168,6 +179,7 @@ interpret_error interpret_declaration(declaration d, vector_context *ctx) {
   }
 
   // return interpret_variable_list(d.variable_list, ctx);
+  return E_INTERPRET_CRASH;
 }
 
 interpret_error interpret(ast program) {
@@ -179,8 +191,8 @@ interpret_error interpret(ast program) {
 
   vector_context ctx;
 
-  for (i = 0; i < program.declarations->index; i++) {
-    d = program.declarations->elements[i];
+  for (i = 0; i < program.declarations.index; i++) {
+    d = program.declarations.elements[i];
 
     error = interpret_declaration(d, &ctx);
     if (error != E_INTERPRET_OK) {
@@ -188,7 +200,7 @@ interpret_error interpret(ast program) {
     }
 
     if (d.type == DECLARATION_FUNCTION &&
-        strcmp((string)d.declaration.function.name->elements, "main")) {
+        strcmp(d.declaration.function.name.elements, "main")) {
       main = d.declaration.function;
       found_main = true;
     }
@@ -201,16 +213,15 @@ interpret_error interpret(ast program) {
 
   expression function;
   function.type = EXPRESSION_IDENTIFIER;
-  // TODO: fill out name
-  memcpy(function->name);
+  vector_char_copy(&function.expression.identifier, "main", 4);
   vector_expression arguments;
-  function_call fc = {function, arguments};
+  function_call fc = {&function, &arguments};
   value v;
   error = interpret_function_call(fc, &ctx, &v);
   if (error != E_INTERPRET_OK) {
     return error;
   }
-  printf("%lf\n", v.double);
+  printf("%lf\n", v.value.number);
 
   return E_INTERPRET_OK;
 }

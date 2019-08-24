@@ -1,28 +1,37 @@
 #include "slowjs/ast.h"
 
+#include "slowjs/lex.h"
+
 void function_call_free(function_call *fc) {
-  expression_free(&fc->function);
+  expression_free(fc->function);
+  free(fc->function);
+
   int i;
-  for (i = 0; i < fc->arguments.index; i++) {
-    expression_free(&fc->arguments.elements[i]);
+  for (i = 0; i < fc->arguments->index; i++) {
+    expression_free(&fc->arguments->elements[i]);
+    free(fc->arguments);
   }
 }
 
 void operator_free(operator*o) {
-  expression_free(&o->left_operand);
-  expression_free(&o->right_operand);
+  expression_free(o->left_operand);
+  free(o->left_operand);
+  expression_free(o->right_operand);
+  free(o->right_operand);
 }
 
 void expression_free(expression *e) {
   switch (e->type) {
   case EXPRESSION_CALL:
-    function_call_free(&e->function_call);
+    function_call_free(&e->expression.function_call);
     break;
   case EXPRESSION_OPERATOR:
-    operator_free(&e->operator);
+    operator_free(&e->expression.operator);
     break;
   case EXPRESSION_IDENTIFIER:
-    vector_char_free(&e->identifier);
+    vector_char_free(&e->expression.identifier);
+    break;
+  case EXPRESSION_NUMBER:
     break;
   }
 }
@@ -35,13 +44,14 @@ void variable_declaration_free(variable_declaration *vd) {
 void statement_free(statement *s) {
   switch (s->type) {
   case STATEMENT_EXPRESSION:
-    expression_free(&s->expression);
+    expression_free(&s->statement.expression);
     break;
   case STATEMENT_RETURN:
-    expression_free(&s->ret);
+    expression_free(&s->statement.ret);
     break;
   case STATEMENT_DECLARATION:
-    declaration_free(&s->declaration);
+    declaration_free(s->statement.declaration);
+    free(s->statement.declaration);
     break;
   }
 }
@@ -61,11 +71,11 @@ void declaration_free(declaration *d) {
 
   switch (d->type) {
   case DECLARATION_FUNCTION:
-    function_declaration_free(&d->function);
+    function_declaration_free(&d->declaration.function);
     break;
   default:
-    for (i = 0; i < d->variable_list.index; i++) {
-      variable_declaration_free(&d->variable_list.elements[i]);
+    for (i = 0; i < d->declaration.variable_list.index; i++) {
+      variable_declaration_free(&d->declaration.variable_list.elements[i]);
     }
   }
 }

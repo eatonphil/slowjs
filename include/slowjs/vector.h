@@ -24,7 +24,7 @@ typedef enum {
   vector_error vector_##t##_push(vector_##t *, t);                             \
   vector_error vector_##t##_get(vector_##t *v, int, t *);                      \
   vector_error vector_##t##_copy(vector_##t *v, t *, int);                     \
-  vector_error vector_##t##_shift(vector_##t *);                               \
+  void vector_##t##_shift(vector_##t *);                                       \
   void vector_##t##_free(vector_##t *);                                        \
                                                                                \
   inline vector_error vector_##t##_init(vector_##t *v) {                       \
@@ -55,21 +55,24 @@ typedef enum {
                                                                                \
   inline vector_error vector_##t##_push(vector_##t *v, t element) {            \
     vector_error error;                                                        \
-    if (v->size == 0) {                                                        \
+    if (v->size != 0) {                                                        \
       error = vector_##t##_init(v);                                            \
+                                                                               \
       if (error != E_VECTOR_OK) {                                              \
         return error;                                                          \
       }                                                                        \
-                                                                               \
-      if (v->index > v->size / 2) {                                            \
-        error = vector_##t##_resize(v, v->size * 2);                           \
-        if (error != E_VECTOR_OK) {                                            \
-          return error;                                                        \
-        }                                                                      \
-      }                                                                        \
-      v->elements[v->index++] = element;                                       \
-      return E_VECTOR_OK;                                                      \
     }                                                                          \
+                                                                               \
+    if (v->index > v->size / 2) {                                              \
+      error = vector_##t##_resize(v, v->size * 2);                             \
+      if (error != E_VECTOR_OK) {                                              \
+        return error;                                                          \
+      }                                                                        \
+    }                                                                          \
+                                                                               \
+    v->elements[v->index++] = element;                                         \
+                                                                               \
+    return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
   inline vector_error vector_##t##_get(vector_##t *v, int index, t *out) {     \
@@ -87,9 +90,10 @@ typedef enum {
       return error;                                                            \
     }                                                                          \
     memcpy(v->elements, src, c);                                               \
+    return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
-  inline vector_error vector_##t##_shift(vector_##t *v) {                      \
+  inline void vector_##t##_shift(vector_##t *v) {                              \
     memcpy(v->elements, v->elements + 1, v->index--);                          \
   }                                                                            \
                                                                                \
@@ -98,5 +102,9 @@ typedef enum {
     v->size = 0;                                                               \
     v->index = 0;                                                              \
   }
+
+DECLARE_VECTOR(char)
+typedef vector_char string;
+DECLARE_VECTOR(string)
 
 #endif

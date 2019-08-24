@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
   }
 
  cleanup_interpret:
+  ast_free(&program);
  cleanup_parse:
   vector_char_free(&source);
  cleanup_file:

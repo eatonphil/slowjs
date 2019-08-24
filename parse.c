@@ -1,85 +1,4 @@
-#include <string.h>
-
-#include "lex.c"
-
-typedef enum {E_PARSE_OK} parse_error;
-
-// Forward declarations
-struct vector_expression;
-struct expression;
-struct declaration;
-
-// TODO: turn all arrays into vectors
-typedef struct {
-  vector_expression function;
-  vector_expression arguments;
-} function_call;
-
-typedef enum {OPERATOR_PLUS, OPERATOR_MINUS, OPERATOR_TIMES, OPERATOR_DIV} operator_type;
-
-typedef struct {
-  operator_type type;
-  expression left_operand;
-  expression right_operand;
-} operator;
-
-typedef enum {EXPRESSION_CALL, EXPRESSION_OPERATOR, EXPRESSION_IDENTIFIER, EXPRESSION_NUMBER} expression_type;
-
-typedef struct {
-  expression_type type;
-  union {
-    function_call function_call;
-    operator operator;
-    number double;
-    vector_char identifier;
-  }
-} expression;
-
-DECLARE_VECTOR(expression);
-
-typedef struct {
-  vector_char name;
-  expression initializer;
-} variable_declaration;
-
-DECLARE_VECTOR(variable_declaration);
-
-typedef struct {
-  statement_type type;
-  union {
-    expression expression;
-    expression ret;
-    declaration declaration;
-  }
-} statement;
-
-DECLARE_VECTOR(statement);
-
-DECLARE_VECTOR(string);
-
-typedef struct {
-  vector_char name;
-  vector_string parameters;
-  vector_statement body;
-} function_declaration;
-
-typedef enum {DECLARATION_FUNCTION, DECLARATION_VAR, DECLARATION_CONST, DECLARATION_LET} declaration_type;
-
-typedef struct {
-  declaration_type type;
-  union {
-    function_declaration function;
-    vector_variable_declaration variable_list;
-  };
-} declaration;
-
-DECLARE_VECTOR(declaration);
-
-typedef struct {
-  vector_declaration declarations;
-} ast;
-
-#define PARSE_ERROR(msg, t) \
+#define PARSE_ERROR(msg, t)                                             \
   LOG_ERROR("parse", sprintf("%s near %d:%d", msg, t->line, t->col), 0)
 
 bool parse_literal(vector_token* tokens, string match) {
@@ -119,6 +38,7 @@ bool parse_parameters(vector_token* tokens, vector_string* parameters) {
   token t;
   char c;
   vector_char parameter;
+  vector_char_init(parameter);
   while (true) {
     if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
       goto failed_match;
@@ -164,7 +84,8 @@ bool parse_function_call(vector_token* tokens, function_call* fc) {
   }
 
   vector_expression expressions;
-  if (!parse_delimited_expressions(tokens, &expressions, ",", ")")) {
+  vector_expression_init(expressions);
+  if (!parse_expressions(tokens, &expressions)) {
     goto failed_match;
   }
 
@@ -275,17 +196,17 @@ bool parse_expression(vector_token* tokens, expression* e) {
   return false;
 }
 
-bool parse_delimited_expressions(vector_token* tokens, vector_expression* expressions, string delimiter, string end) {
+bool parse_expressions(vector_token* tokens, vector_expression* expressions) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
   expression e;
   while (true) {
-    if (parse_literal(tokens, end)) {
+    if (parse_literal(tokens, ")")) {
       break;
     }
 
-    if (expressions->index > 0 && !parse_literal(tokens, delimiter)) {
+    if (expressions->index > 0 && !parse_literal(tokens, ",")) {
       goto failed_match;
     }
 
@@ -294,6 +215,40 @@ bool parse_delimited_expressions(vector_token* tokens, vector_expression* expres
     }
 
     if (vector_expression_push(block, e) != E_VECTOR_OK) {
+      goto failed_match;
+    }
+  }
+
+  return true;
+
+ failed_match:
+  vector_token_copy(tokens, tokens_original, tokens_original->index);
+  return false;
+}
+
+bool parse_statement(vector_token* tokens, statement* statement) {
+   
+}
+ 
+bool parse_statements(vector_token* tokens, vector_statement* statements) {
+  vector_token tokens_original;
+  vector_token_copy(tokens_original, tokens->elements, tokens->index);
+
+  statement s;
+  while (true) {
+    if (parse_literal(tokens, "}")) {
+      break;
+    }
+
+    if (statements->index > 0 && !parse_literal(tokens, ";")) {
+      goto failed_match;
+    }
+
+    if (!parse_statement(tokens, &s)) {
+      goto failed_match;
+    }
+
+    if (vector_statement_push(block, s) != E_VECTOR_OK) {
       goto failed_match;
     }
   }
@@ -342,7 +297,7 @@ bool parse_function_declaration(vector_token* tokens, function_declaration* fd) 
     goto failed_match;
   }
 
-  if (!parse_delimited_expressions(tokens, &fd->body, ";", "}")) {
+  if (!parse_statements(tokens, &fd->body)) {
     goto failed_match;
   }
 
@@ -424,5 +379,3 @@ parse_error parse(vector_char source, ast* program_out) {
   vector_token_free(tokens);
   return error;
 }
-
-// TODO: implement free operations on all AST

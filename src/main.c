@@ -1,17 +1,19 @@
 typedef enum { false, true } bool;
 
-#define LOG_ERROR(triggering_module, msg, errno)                        \
-  fprintf(stderr, "[%s:%d] %s from %s: %d", __FILE__, __LINE__, msg, triggering_module, errno)
+#define LOG_ERROR(triggering_module, msg, errno)                               \
+  fprintf(stderr, "[%s:%d] %s from %s: %d", __FILE__, __LINE__, msg,           \
+          triggering_module, errno)
 
-#include "vector.c"
 #include "file.c"
-#include "parse.c"
 #include "interpret.c"
+#include "lex.c"
+#include "parse.c"
+#include "vector.c"
 
 int main(int argc, char **argv) {
   int error = 0;
 
-  if (argc !== 2) {
+  if (argc != = 2) {
     printf("Expected a JavaScript file argument, got nothing.");
     return 1;
   }
@@ -36,10 +38,10 @@ int main(int argc, char **argv) {
     goto cleanup_interpret;
   }
 
- cleanup_interpret:
+cleanup_interpret:
   ast_free(&program);
- cleanup_parse:
+cleanup_parse:
   vector_char_free(&source);
- cleanup_file:
+cleanup_file:
   return error;
 }

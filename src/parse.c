@@ -1,7 +1,6 @@
-#define PARSE_ERROR(msg, t)                                             \
-  LOG_ERROR("parse", sprintf("%s near %d:%d", msg, t->line, t->col), 0)
+#include "slowjs/parse.h"
 
-bool parse_literal(vector_token* tokens, string match) {
+bool parse_literal(vector_token *tokens, string match) {
   token t;
   int error = vector_token_get(tokens, 0, &t);
   if (error != E_VECTOR_OK) {
@@ -15,10 +14,16 @@ bool parse_literal(vector_token* tokens, string match) {
   return vector_token_shift(tokens) == E_VECTOR_OK;
 }
 
-bool parse_identifier(vector_token* tokens, vector_char* identifer_out) {
+bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
+  token t;
+  if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
+    return false;
+  }
+
   for (i = 0; i < t->index; i++) {
     c = t->elements[i];
-    if (c != '$' && c != '_' && !((c >= 'a' && c <= 'z') ||) (c >= 'A' && c <= 'Z')) {
+    if (c != '$' && c != '_' &&
+        !((c >= 'a' && c <= 'z') ||)(c >= 'A' && c <= 'Z')) {
       continue;
     }
 
@@ -30,7 +35,7 @@ bool parse_identifier(vector_token* tokens, vector_char* identifer_out) {
   return vector_token_shift(tokens) == E_VECTOR_OK;
 }
 
-bool parse_parameters(vector_token* tokens, vector_string* parameters) {
+bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -38,7 +43,6 @@ bool parse_parameters(vector_token* tokens, vector_string* parameters) {
   token t;
   char c;
   vector_char parameter;
-  vector_char_init(parameter);
   while (true) {
     if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
       goto failed_match;
@@ -65,12 +69,12 @@ bool parse_parameters(vector_token* tokens, vector_string* parameters) {
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_function_call(vector_token* tokens, function_call* fc) {
+bool parse_function_call(vector_token *tokens, function_call *fc) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -84,20 +88,19 @@ bool parse_function_call(vector_token* tokens, function_call* fc) {
   }
 
   vector_expression expressions;
-  vector_expression_init(expressions);
   if (!parse_expressions(tokens, &expressions)) {
     goto failed_match;
   }
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_number(vector_token* tokens, double* n) {
-  char* notfound;
+bool parse_number(vector_token *tokens, double *n) {
+  char *notfound;
   token t;
 
   if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
@@ -112,7 +115,7 @@ bool parse_number(vector_token* tokens, double* n) {
   return false;
 }
 
-bool parse_operator(vector_token* tokens, expression* e) {
+bool parse_operator(vector_token *tokens, expression *e) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -147,12 +150,12 @@ bool parse_operator(vector_token* tokens, expression* e) {
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_expression(vector_token* tokens, expression* e) {
+bool parse_expression(vector_token *tokens, expression *e) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -179,7 +182,7 @@ bool parse_expression(vector_token* tokens, expression* e) {
   operator o;
   if (parse_operator(tokens, &o)) {
     expression->type = EXPRESSION_OPERATOR;
-    expression->operator = o;
+    expression->operator= o;
     return true;
   }
 
@@ -196,7 +199,7 @@ bool parse_expression(vector_token* tokens, expression* e) {
   return false;
 }
 
-bool parse_expressions(vector_token* tokens, vector_expression* expressions) {
+bool parse_expressions(vector_token *tokens, vector_expression *expressions) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -221,16 +224,19 @@ bool parse_expressions(vector_token* tokens, vector_expression* expressions) {
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_statement(vector_token* tokens, statement* statement) {
-   
+bool parse_statement(vector_token *tokens, statement *statement) {
+  declaration d;
+
+  if (parse_declaration(tokens, &d)) {
+  }
 }
- 
-bool parse_statements(vector_token* tokens, vector_statement* statements) {
+
+bool parse_statements(vector_token *tokens, vector_statement *statements) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
@@ -255,20 +261,17 @@ bool parse_statements(vector_token* tokens, vector_statement* statements) {
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_function_declaration(vector_token* tokens, function_declaration* fd) {
+bool parse_function_declaration(vector_token *tokens,
+                                function_declaration *fd) {
   vector_token tokens_original;
   vector_token_copy(tokens_original, tokens->elements, tokens->index);
 
   if (!parse_literal(tokens, "function")) {
-    goto failed_match;
-  }
-
-  if (vector_char_init(vd->name) != E_VECTOR_OK) {
     goto failed_match;
   }
 
@@ -303,12 +306,13 @@ bool parse_function_declaration(vector_token* tokens, function_declaration* fd) 
 
   return true;
 
- failed_match:
+failed_match:
   vector_token_copy(tokens, tokens_original, tokens_original->index);
   return false;
 }
 
-bool parse_const_declaration(vector_token* tokens, vector_variable_declaration* vd) {
+bool parse_const_declaration(vector_token *tokens,
+                             vector_variable_declaration *vd) {
   if (!parse_literal(tokens, "const")) {
     return false;
   }
@@ -316,7 +320,8 @@ bool parse_const_declaration(vector_token* tokens, vector_variable_declaration* 
   return false;
 }
 
-bool parse_let_declaration(vector_token* tokens, vector_variable_declaration* vd) {
+bool parse_let_declaration(vector_token *tokens,
+                           vector_variable_declaration *vd) {
   if (!parse_literal(tokens, "let")) {
     return false;
   }
@@ -324,7 +329,8 @@ bool parse_let_declaration(vector_token* tokens, vector_variable_declaration* vd
   return false;
 }
 
-bool parse_var_declaration(vector_token* tokens, vector_variable_declaration* vd) {
+bool parse_var_declaration(vector_token *tokens,
+                           vector_variable_declaration *vd) {
   if (!parse_literal(tokens, "var")) {
     return false;
   }
@@ -332,16 +338,10 @@ bool parse_var_declaration(vector_token* tokens, vector_variable_declaration* vd
   return false;
 }
 
-parse_error parse(vector_char source, ast* program_out) {
+parse_error parse(vector_char source, ast *program_out) {
   parse_error error = E_PARSE_OK;
 
   vector_token tokens;
-  error = vector_token_init(&tokens);
-  if (error != E_VECTOR_OK) {
-    LOG_ERROR("vector", "Error during initialization", error);
-    goto cleanup_init;
-  }
-
   error = lex(source, &tokens);
   if (error != E_LEX_OK) {
     LOG_ERROR("lex", "Error during initialization", error);
@@ -374,8 +374,8 @@ parse_error parse(vector_char source, ast* program_out) {
     vector_declaration_push(&program_out->declarations, d);
   }
 
- cleanup_lex:
- cleanup_init:
+cleanup_lex:
+cleanup_init:
   vector_token_free(tokens);
   return error;
 }

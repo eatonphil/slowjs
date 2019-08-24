@@ -1,5 +1,7 @@
 #include "slowjs/interpret.h"
 
+#include <string.h>
+
 #include "slowjs/ast.h"
 #include "slowjs/vector.h"
 
@@ -35,6 +37,42 @@ typedef struct context context;
 DECLARE_VECTOR(context)
 
 interpret_error interpret_expression(expression, vector_context *, value *);
+interpret_error interpret_statements(vector_statement, vector_context *,
+                                     value *);
+interpret_error interpret_declaration(declaration, vector_context *);
+
+interpret_error interpret_function_call(function_call fc, vector_context *ctx,
+                                        value *result) {
+  value function = interpret_expression(fc.function);
+  if (function.type != VALUE_CLOSURE) {
+    return E_INTERPRET_CALL_NONFUNCTION;
+  }
+
+  vector_context child_ctx;
+  if (vector_context_copy(&child_ctx, ctx->elements, ctx->index)) {
+    return E_INTERPRET_CRASH;
+  }
+
+  int i;
+  value v;
+  vector_char p;
+  interpret_error error;
+  context mapping;
+  for (i = 0; i < function.value.closure.parameters.index; i++) {
+    // TODO: guard against inequal number of arguments
+    p = function.value.closure.parameters.elements[i];
+    error = interpret_expression(fc.arguments.elements[i], ctx, &v);
+    if (error != E_INTERPRET_OK) {
+      return error;
+    }
+
+    mapping.id = p;
+    mapping.value = v;
+    vector_context_push(&child_ctx, mapping);
+  }
+
+  return interpret_statements(function.value.closure.body, &child_ctx, result);
+}
 
 interpret_error interpret_operator(operator o, vector_context *ctx,
                                    value *result) {
@@ -93,56 +131,38 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
   }
 }
 
-interpret_error interpret_block(vector_expression body, vector_context *ctx,
-                                value *result) {
-  int i;
-  interpret_error error;
+interpret_error interpret_statement(statement s, vector_context *ctx,
+                                    value *result) {
   value nothing;
-  for (i = 0; i < body.index; i++) {
-    error = interpret_expression(body.elements[i], ctx, &nothing);
+  switch (s.type) {
+  case STATEMENT_RETURN:
+    return interpret_expression(s.statement.ret, ctx, result);
+  case STATEMENT_EXPRESSION:
+    return interpret_expression(s.statement.expression, ctx, &nothing);
+  case STATEMENT_DECLARATION:
+    return interpret_declaration(s.statement.declaration, ctx);
   }
 }
 
-interpret_error interpret_function_call(function_call fc, vector_context *ctx,
-                                        value *result) {
-  value function = interpret_expression(fc.function);
-  if (function.type != VALUE_CLOSURE) {
-    return E_INTERPRET_CALL_NONFUNCTION;
-  }
-
-  vector_context child_ctx;
-  if (vector_context_copy(&child_ctx, ctx->elements, ctx->index)) {
-    return E_INTERPRET_CRASH;
-  }
-
+interpret_error interpret_statements(vector_statement body, vector_context *ctx,
+                                     value *result) {
   int i;
-  value v;
-  vector_char p;
   interpret_error error;
-  context mapping;
-  for (i = 0; i < function.value.closure.parameters.index; i++) {
-    p = function.value.closure.parameters.elements[i];
-    error = interpret_expression(p, ctx, &v);
-    if (error != E_INTERPRET_OK) {
-      return error;
-    }
-
-    mapping.id = p;
-    mapping.value = v;
-    vector_context_push(&child_ctx, mapping);
+  for (i = 0; i < body.index; i++) {
+    error = interpret_statement(body.elements[i], ctx, result);
   }
-
-  return interpret_block(function.value.closure.body, &child_ctx, result);
 }
 
 interpret_error interpret_function_declaration(function_declaration fd,
                                                vector_context *ctx) {
   closure c = {ctx, fd.parameters, fd.body};
-  context mapping = {fd.name, c};
+  value v = {VALUE_CLOSURE};
+  v.value.closure = c;
+  context mapping = {fd.name, v};
   return (interpret_error)vector_context_push(ctx, mapping);
 }
 
-interpret_error interpet_declaration(declaration d, vector_context *ctx) {
+interpret_error interpret_declaration(declaration d, vector_context *ctx) {
   if (d.type == DECLARATION_FUNCTION) {
     return interpret_function_declaration(d.declaration.function, ctx);
   }
@@ -169,7 +189,7 @@ interpret_error interpret(ast program) {
 
     if (d.type == DECLARATION_FUNCTION &&
         strcmp((string)d.declaration.function.name->elements, "main")) {
-      fd = d.declaration.function;
+      main = d.declaration.function;
       found_main = true;
     }
   }
@@ -181,7 +201,8 @@ interpret_error interpret(ast program) {
 
   expression function;
   function.type = EXPRESSION_IDENTIFIER;
-  memcpy(function->);
+  // TODO: fill out name
+  memcpy(function->name);
   vector_expression arguments;
   function_call fc = {function, arguments};
   value v;

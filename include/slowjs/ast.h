@@ -1,5 +1,5 @@
-#ifndef ast
-#define ast
+#ifndef _AST_H_
+#define _AST_H_
 
 #include <string.h>
 

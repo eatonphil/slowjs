@@ -1,5 +1,5 @@
-#ifndef parse
-#define parse
+#ifndef _PARSE_H_
+#define _PARSE_H_
 
 #include "slowjs/ast.h"
 #include "slowjs/vector.h"

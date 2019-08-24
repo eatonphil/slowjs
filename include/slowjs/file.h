@@ -1,5 +1,5 @@
-#ifndef file
-#define file
+#ifndef _FILE_H_
+#define _FILE_H_
 
 #include "slowjs/vector.h"
 

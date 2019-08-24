@@ -1,5 +1,5 @@
-#ifndef interpret
-#define interpret
+#ifndef _INTERPRET_H_
+#define _INTERPRET_H_
 
 #include "slowjs/ast.h"
 

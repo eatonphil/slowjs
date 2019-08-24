@@ -1,17 +1,19 @@
-#ifndef lex
-#define lex
+#ifndef _LEX_H_
+#define _LEX_H_
 
 #include "slowjs/vector.h"
 
-typedef enum { E_LEX_OK, E_LEX_INIT } lex_error;
+enum lex_error { E_LEX_OK, E_LEX_INIT };
+typedef enum lex_error lex_error;
 
-typedef struct {
+struct token {
   int line;
   int col;
   vector_char string;
-} token;
+};
+typedef struct token token;
 
-DECLARE_VECTOR(token);
+DECLARE_VECTOR(token)
 
 lex_error lex(vector_char, vector_token *);
 

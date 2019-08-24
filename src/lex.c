@@ -6,12 +6,12 @@ vector_error vector_token_push_char(vector_token *v, int line, int col,
   t.col = col;
   t.line = line;
 
-  error = vector_char_push(&t.source, c);
+  vector_error error = vector_char_push(&t.string, c);
   if (error != E_VECTOR_OK) {
     return error;
   }
 
-  return vector_token_push(tokens_out, t);
+  return vector_token_push(v, t);
 }
 
 lex_error lex(vector_char source, vector_token *tokens_out) {

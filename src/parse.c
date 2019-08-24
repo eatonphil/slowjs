@@ -7,11 +7,11 @@
 #include "slowjs/lex.h"
 
 #define PARSE_ERROR(msg, t)                                                    \
-  fprintf(stderr, "[%s:%d] %s near %d:%d", __FILE__, __LINE__, msg, t.line,    \
+  fprintf(stderr, "[%s:%d] %s near %d:%d\n", __FILE__, __LINE__, msg, t.line,  \
           t.col)
 
 bool parse_literal(vector_token *tokens, const char *match) {
-  token t;
+  token t = {0};
   int error = vector_token_get(tokens, 0, &t);
   if (error != E_VECTOR_OK) {
     return false;
@@ -26,13 +26,14 @@ bool parse_literal(vector_token *tokens, const char *match) {
 }
 
 bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
-  token t;
+  token t = {0};
   if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
     return false;
   }
 
   int i;
   char c;
+
   for (i = 0; i < t.string.index; i++) {
     c = t.string.elements[i];
     if (c != '$' && c != '_' &&
@@ -50,13 +51,14 @@ bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
 }
 
 bool parse_parameters(vector_token *tokens, vector_string *parameters) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   int i;
-  token t;
+  token t = {0};
   char c;
-  vector_char parameter;
+  vector_char parameter = {0};
+
   while (true) {
     if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
       goto failed_match;
@@ -92,10 +94,10 @@ bool parse_expression(vector_token *, expression *);
 bool parse_expressions(vector_token *, vector_expression *);
 
 bool parse_function_call(vector_token *tokens, function_call *fc) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  expression function;
+  expression function = {0};
   if (!parse_expression(tokens, &function)) {
     goto failed_match;
   }
@@ -104,7 +106,7 @@ bool parse_function_call(vector_token *tokens, function_call *fc) {
     goto failed_match;
   }
 
-  vector_expression expressions;
+  vector_expression expressions = {0};
   if (!parse_expressions(tokens, &expressions)) {
     goto failed_match;
   }
@@ -118,7 +120,7 @@ failed_match:
 
 bool parse_number(vector_token *tokens, double *n) {
   char *notfound;
-  token t;
+  token t = {0};
 
   if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
     return false;
@@ -137,15 +139,15 @@ bool parse_number(vector_token *tokens, double *n) {
 }
 
 bool parse_operator(vector_token *tokens, operator*o) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  expression left, right;
+  expression left = {0}, right = {0};
   if (!parse_expression(tokens, &left)) {
     goto failed_match;
   }
 
-  token t;
+  token t = {0};
   if (!(o->left_operand = malloc(sizeof(expression))) ||
       !(o->right_operand = malloc(sizeof(expression)))) {
     goto failed_match;
@@ -179,10 +181,10 @@ failed_match:
 }
 
 bool parse_expression(vector_token *tokens, expression *e) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  vector_char id;
+  vector_char id = {0};
   if (parse_identifier(tokens, &id)) {
     e->type = EXPRESSION_IDENTIFIER;
     e->expression.identifier = id;
@@ -195,14 +197,14 @@ bool parse_expression(vector_token *tokens, expression *e) {
     e->expression.number = n;
   }
 
-  function_call fc;
+  function_call fc = {0};
   if (parse_function_call(tokens, &fc)) {
     e->type = EXPRESSION_CALL;
     e->expression.function_call = fc;
     return true;
   }
 
-  operator o;
+  operator o = {0};
   if (parse_operator(tokens, &o)) {
     e->type = EXPRESSION_OPERATOR;
     e->expression.operator= o;
@@ -223,10 +225,10 @@ bool parse_expression(vector_token *tokens, expression *e) {
 }
 
 bool parse_expressions(vector_token *tokens, vector_expression *expressions) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  expression e;
+  expression e = {0};
   while (true) {
     if (parse_literal(tokens, ")")) {
       break;
@@ -255,11 +257,11 @@ failed_match:
 bool parse_declaration(vector_token *tokens, declaration *);
 
 bool parse_statement(vector_token *tokens, statement *statement) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  declaration d;
-  expression e;
+  declaration d = {0};
+  expression e = {0};
 
   if (parse_declaration(tokens, &d)) {
     statement->type = STATEMENT_DECLARATION;
@@ -287,10 +289,11 @@ failed_match:
 }
 
 bool parse_statements(vector_token *tokens, vector_statement *statements) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
-  statement s;
+  statement s = {0};
+
   while (true) {
     if (parse_literal(tokens, "}")) {
       break;
@@ -318,14 +321,14 @@ failed_match:
 
 bool parse_function_declaration(vector_token *tokens,
                                 function_declaration *fd) {
-  vector_token tokens_original;
+  vector_token tokens_original = {0};
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   if (!parse_literal(tokens, "function")) {
     goto failed_match;
   }
 
-  token t;
+  token t = {0};
   if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
     goto failed_match;
   }
@@ -390,8 +393,8 @@ bool parse_var_declaration(vector_token *tokens,
 }
 
 bool parse_declaration(vector_token *tokens, declaration *d) {
-  vector_variable_declaration vd;
-  function_declaration fd;
+  vector_variable_declaration vd = {0};
+  function_declaration fd = {0};
 
   if (parse_function_declaration(tokens, &fd)) {
     d->type = DECLARATION_FUNCTION;
@@ -415,14 +418,14 @@ bool parse_declaration(vector_token *tokens, declaration *d) {
 parse_error parse(vector_char source, ast *program_out) {
   parse_error error = E_PARSE_OK;
 
-  vector_token tokens;
+  vector_token tokens = {0};
   error = (parse_error)lex(source, &tokens);
   if (error != E_LEX_OK) {
     LOG_ERROR("lex", "Error during initialization", error);
     goto cleanup_lex;
   }
 
-  declaration d;
+  declaration d = {0};
 
   while (true) {
     d = (declaration){0};

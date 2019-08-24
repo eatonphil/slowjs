@@ -5,7 +5,7 @@
 #include "slowjs/common.h"
 
 #define LEX_ERROR(msg, t)                                                      \
-  fprintf(stderr, "[%s:%d] %s near %d:%d", __FILE__, __LINE__, msg, t.line,    \
+  fprintf(stderr, "[%s:%d] %s near %d:%d\n", __FILE__, __LINE__, msg, t.line,  \
           t.col)
 
 vector_error vector_token_push_char(vector_token *v, int line, int col,
@@ -59,6 +59,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
 
       error = (lex_error)vector_token_push(tokens_out, current);
       if (error != E_VECTOR_OK) {
+        LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
 
@@ -83,6 +84,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
       if (current.string.index) {
         error = (lex_error)vector_token_push(tokens_out, current);
         if (error != E_VECTOR_OK) {
+          LEX_ERROR("Error lexing", current);
           goto cleanup_loop;
         }
 
@@ -92,6 +94,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
       error = (lex_error)vector_token_push_char(tokens_out, c, current.line,
                                                 current.col + 1);
       if (error != E_VECTOR_OK) {
+        LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
 
@@ -99,6 +102,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     default:
       error = (lex_error)vector_char_push(&current.string, c);
       if (error != E_VECTOR_OK) {
+        LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
 
@@ -107,7 +111,6 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
   }
 
 cleanup_loop:
-  LEX_ERROR("Error lexing", current);
   vector_char_free(&current.string);
 cleanup_init:
   return error;

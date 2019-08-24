@@ -1,5 +1,6 @@
 SRC := src
+INCLUDE := include
 
-bin/slowjs: $(SRC)/*.c
+bin/slowjs: $(SRC)/*.c  $(INCLUDE)/slowjs/*.h
 	@rm -rf bin && mkdir bin
-	$(CC) -I include $^ -o $@
+	$(CC) -I $(INCLUDE) $(SRC)/*.c -o $@

@@ -1,6 +1,7 @@
 #ifndef _VECTOR_H_
 #define _VECTOR_H_
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,9 +14,9 @@ typedef enum {
 
 #define DECLARE_VECTOR(t)                                                      \
   struct vector_##t {                                                          \
-    t *elements;                                                               \
     int index;                                                                 \
     int size;                                                                  \
+    t *elements;                                                               \
   };                                                                           \
   typedef struct vector_##t vector_##t;                                        \
                                                                                \
@@ -42,14 +43,18 @@ typedef enum {
   }                                                                            \
                                                                                \
   static vector_error vector_##t##_resize(vector_##t *v, int c) {              \
-    v->size = c;                                                               \
-    t *new_elements = malloc(sizeof(t) * v->size);                             \
+    t *new_elements = malloc(sizeof(t) * c);                                   \
     if (new_elements == 0) {                                                   \
       return E_VECTOR_INIT_MALLOC;                                             \
     }                                                                          \
-    memcpy(new_elements, v->elements, sizeof(t) * v->size / 2);                \
-    vector_##t##_free(v);                                                      \
+    memcpy(new_elements, v->elements, sizeof(t) * v->size);                    \
+                                                                               \
+    if (v->size) {                                                             \
+      free(v->elements);                                                       \
+    }                                                                          \
+                                                                               \
     v->elements = new_elements;                                                \
+    v->size = c;                                                               \
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
@@ -98,7 +103,9 @@ typedef enum {
   }                                                                            \
                                                                                \
   static void vector_##t##_free(vector_##t *v) {                               \
-    free(v->elements);                                                         \
+    if (v->size) {                                                             \
+      free(v->elements);                                                       \
+    }                                                                          \
     v->size = 0;                                                               \
     v->index = 0;                                                              \
   }

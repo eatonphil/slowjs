@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   struct sigaction action = {0};
   action.sa_handler = generateBacktrace;
   if (sigaction(SIGSEGV, &action, NULL) < 0) {
-    printf("TNET: Unable to register segfault handler.\n");
+    printf("Unable to register segfault handler.\n");
     return 1;
   }
 
@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
   vector_char source;
   int error = read_file(argv[1], &source);
   if (error != E_FILE_OK) {
+    printf("Error reading file.\n");
     error = error;
     goto cleanup_file;
   }
@@ -47,12 +48,14 @@ int main(int argc, char **argv) {
   ast program;
   error = parse(source, &program);
   if (error != E_PARSE_OK) {
+    printf("Error parsing program.\n");
     error = error;
     goto cleanup_parse;
   }
 
   error = interpret(program);
   if (error != E_INTERPRET_OK) {
+    printf("Error interpreting program.\n");
     error = error;
     goto cleanup_interpret;
   }

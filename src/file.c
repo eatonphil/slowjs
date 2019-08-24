@@ -36,7 +36,7 @@ file_error read_file(char *path, vector_char *source_out) {
   munmap(contents, len);
 
 cleanup_read:
-  if (!close(fd)) {
+  if (close(fd) != 0) {
     LOG_ERROR("libc", "Error closing file", errno);
     error = E_FILE_CLOSE;
   }

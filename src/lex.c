@@ -4,32 +4,30 @@
 
 #include "slowjs/common.h"
 
-#define LEX_ERROR(msg, t)                                                      \
-  fprintf(stderr, "[%s:%d] %s near %d:%d\n", __FILE__, __LINE__, msg, t.line,  \
-          t.col)
+#define LEX_ERROR(msg, t) fprintf(stderr, "%s near %d:%d\n", msg, t.line, t.col)
 
 vector_error vector_token_push_char(vector_token *v, int line, int col,
                                     char c) {
-  token t;
+  token t = {0};
   t.col = col;
   t.line = line;
 
-  vector_error error = vector_char_push(&t.string, c);
-  if (error != E_VECTOR_OK) {
-    return error;
+  vector_error err = vector_char_push(&t.string, c);
+  if (err != E_VECTOR_OK) {
+    return err;
   }
 
   return vector_token_push(v, t);
 }
 
 lex_error lex(vector_char source, vector_token *tokens_out) {
-  lex_error error = E_LEX_OK;
+  lex_error err = E_LEX_OK;
 
   char c;
   int i;
   bool in_comment = false;
 
-  token current;
+  token current = {0};
   for (i = 0; i < source.index; i++) {
     c = source.elements[i];
 
@@ -57,8 +55,8 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
         continue;
       }
 
-      error = (lex_error)vector_token_push(tokens_out, current);
-      if (error != E_VECTOR_OK) {
+      err = (lex_error)vector_token_push(tokens_out, current);
+      if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
@@ -82,8 +80,8 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     case ':':
       // TODO: support double character operators: +=, ++, &&, etc.
       if (current.string.index) {
-        error = (lex_error)vector_token_push(tokens_out, current);
-        if (error != E_VECTOR_OK) {
+        err = (lex_error)vector_token_push(tokens_out, current);
+        if (err != E_VECTOR_OK) {
           LEX_ERROR("Error lexing", current);
           goto cleanup_loop;
         }
@@ -91,17 +89,17 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
         vector_char_free(&current.string);
       }
 
-      error = (lex_error)vector_token_push_char(tokens_out, c, current.line,
-                                                current.col + 1);
-      if (error != E_VECTOR_OK) {
+      err = (lex_error)vector_token_push_char(tokens_out, c, current.line,
+                                              current.col + 1);
+      if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
 
       break;
     default:
-      error = (lex_error)vector_char_push(&current.string, c);
-      if (error != E_VECTOR_OK) {
+      err = (lex_error)vector_char_push(&current.string, c);
+      if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
@@ -113,5 +111,5 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
 cleanup_loop:
   vector_char_free(&current.string);
 cleanup_init:
-  return error;
+  return err;
 }

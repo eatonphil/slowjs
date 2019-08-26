@@ -118,7 +118,8 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
   case EXPRESSION_IDENTIFIER:
     for (i = 0; i < ctx->index; i++) {
       if (strncmp(ctx->elements[i].id.elements,
-                  e.expression.identifier.elements, ctx->elements[i].id.size)) {
+                  e.expression.identifier.elements,
+                  ctx->elements[i].id.index)) {
         *result = ctx->elements[i].value;
         return E_INTERPRET_OK;
       }

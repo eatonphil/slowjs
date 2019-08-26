@@ -7,8 +7,7 @@
 #include "slowjs/lex.h"
 
 #define PARSE_ERROR(msg, t)                                                    \
-  fprintf(stderr, "[%s:%d] %s near %d:%d\n", __FILE__, __LINE__, msg, t.line,  \
-          t.col)
+  fprintf(stderr, "%s near %d:%d.\n", msg, t.line, t.col)
 
 bool parse_literal(vector_token *tokens, const char *match) {
   token t = {0};
@@ -330,27 +329,33 @@ bool parse_function_declaration(vector_token *tokens,
 
   token t = {0};
   if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
+    PARSE_ERROR("Expected function name", t);
     goto failed_match;
   }
 
   if (vector_char_copy(&fd->name, t.string.elements, t.string.index) !=
       E_VECTOR_OK) {
+    PARSE_ERROR("Expected function name", t);
     goto failed_match;
   }
 
   if (!parse_literal(tokens, "(")) {
+    PARSE_ERROR("Expected parenthesis after function name", t);
     goto failed_match;
   }
 
   if (!parse_parameters(tokens, &fd->parameters)) {
+    PARSE_ERROR("Expected parameters", t);
     goto failed_match;
   }
 
   if (!parse_literal(tokens, ")")) {
+    PARSE_ERROR("Expected closing parenthesis", t);
     goto failed_match;
   }
 
   if (!parse_literal(tokens, "{")) {
+    PARSE_ERROR("Expected opening brace", t);
     goto failed_match;
   }
 
@@ -425,11 +430,26 @@ parse_error parse(vector_char source, ast *program_out) {
     goto cleanup_lex;
   }
 
+  int i;
+  for (i = 0; i < tokens.index; i++) {
+    vector_char_push(&tokens.elements[i].string, 0);
+    printf("%s:%d\n", tokens.elements[i].string.elements,
+           tokens.elements[i].string.index - 1);
+  }
+
+  token t = {0};
+  if (!tokens.index) {
+    PARSE_ERROR("Program is empty", t);
+    error = E_PARSE_EMPTY;
+    goto cleanup_lex;
+  }
+
   declaration d = {0};
 
-  while (true) {
+  while (tokens.index) {
     d = (declaration){0};
     if (!parse_declaration(&tokens, &d)) {
+      PARSE_ERROR("Expected top-level declaration", tokens.elements[0]);
       error = E_PARSE_TOPLEVEL_DECLARATION;
       goto cleanup_lex;
     }

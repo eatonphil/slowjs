@@ -34,7 +34,7 @@ typedef enum {
     }                                                                          \
     v->size = 8;                                                               \
     v->index = 0;                                                              \
-    v->elements = malloc(sizeof(t) * v->size);                                 \
+    v->elements = (t *)malloc(sizeof(t) * v->size);                            \
     if (v->elements == 0) {                                                    \
       return E_VECTOR_INIT_MALLOC;                                             \
     }                                                                          \
@@ -43,7 +43,7 @@ typedef enum {
   }                                                                            \
                                                                                \
   static vector_error vector_##t##_resize(vector_##t *v, int c) {              \
-    t *new_elements = malloc(sizeof(t) * c);                                   \
+    t *new_elements = (t *)malloc(sizeof(t) * c);                              \
     if (new_elements == 0) {                                                   \
       return E_VECTOR_INIT_MALLOC;                                             \
     }                                                                          \
@@ -60,7 +60,7 @@ typedef enum {
                                                                                \
   static vector_error vector_##t##_push(vector_##t *v, t element) {            \
     vector_error error;                                                        \
-    if (v->size != 0) {                                                        \
+    if (v->size == 0) {                                                        \
       error = vector_##t##_init(v);                                            \
                                                                                \
       if (error != E_VECTOR_OK) {                                              \
@@ -95,6 +95,7 @@ typedef enum {
       return error;                                                            \
     }                                                                          \
     memcpy(v->elements, src, c);                                               \
+    v->index = c;                                                              \
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \

@@ -37,18 +37,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  vector_char source;
+  vector_char source = {0};
   int error = read_file(argv[1], &source);
   if (error != E_FILE_OK) {
-    printf("Error reading file.\n");
     error = error;
     goto cleanup_file;
   }
 
-  ast program;
+  ast program = {0};
   error = parse(source, &program);
   if (error != E_PARSE_OK) {
-    printf("Error parsing program.\n");
     error = error;
     goto cleanup_parse;
   }

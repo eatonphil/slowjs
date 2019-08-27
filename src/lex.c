@@ -4,7 +4,8 @@
 
 #include "slowjs/common.h"
 
-#define LEX_ERROR(msg, t) fprintf(stderr, "%s near %d:%d\n", msg, t.line, t.col)
+#define LEX_ERROR(msg, t)                                                      \
+  fprintf(stderr, "%s near %d:%d\n", msg, t->line, t->col)
 
 vector_error vector_token_push_char(vector_token *v, int line, int col,
                                     char c) {
@@ -27,16 +28,20 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
   int i;
   bool in_comment = false;
 
-  token current = {0};
+  token *current = (token *)malloc(sizeof(token));
+  if (!current) {
+    return E_LEX_MALLOC;
+  }
+
   for (i = 0; i < source.index; i++) {
     c = source.elements[i];
 
     if (c == '\n') {
       in_comment = false;
-      current.line++;
+      current->line++;
       continue;
     } else {
-      current.col++;
+      current->col++;
       if (in_comment) {
         continue;
       }
@@ -51,17 +56,17 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     switch (c) {
     case ' ':
     case '\t':
-      if (!current.string.index) {
+      if (!current->string.index) {
         continue;
       }
 
-      err = (lex_error)vector_token_push(tokens_out, current);
+      err = (lex_error)vector_token_push(tokens_out, *current);
       if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
       }
 
-      vector_char_free(&current.string);
+      memset(current, 0, sizeof(token));
       break;
     case '{':
     case '}':
@@ -79,18 +84,17 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     case '.':
     case ':':
       // TODO: support double character operators: +=, ++, &&, etc.
-      if (current.string.index) {
-        err = (lex_error)vector_token_push(tokens_out, current);
+      if (current->string.index) {
+        err = (lex_error)vector_token_push(tokens_out, *current);
         if (err != E_VECTOR_OK) {
           LEX_ERROR("Error lexing", current);
-          goto cleanup_loop;
         }
 
-        vector_char_free(&current.string);
+        memset(current, 0, sizeof(token));
       }
 
-      err = (lex_error)vector_token_push_char(tokens_out, c, current.line,
-                                              current.col + 1);
+      err = (lex_error)vector_token_push_char(tokens_out, c, current->line,
+                                              current->col + 1);
       if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
@@ -98,7 +102,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
 
       break;
     default:
-      err = (lex_error)vector_char_push(&current.string, c);
+      err = (lex_error)vector_char_push(&current->string, c);
       if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
         goto cleanup_loop;
@@ -109,7 +113,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
   }
 
 cleanup_loop:
-  vector_char_free(&current.string);
+  free(current);
 cleanup_init:
   return err;
 }

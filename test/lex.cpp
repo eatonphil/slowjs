@@ -7,12 +7,15 @@ extern "C" {
 TEST(lex, addition) {
   const char *raw_source = "a + 1";
   vector_char source = {0};
-  vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
+
+  vector_error verr =
+      vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
+  ASSERT_EQ(E_VECTOR_OK, verr);
 
   vector_token tokens = {0};
-  lex_error err = lex(source, &tokens);
 
-  ASSERT_EQ(E_LEX_OK, err);
+  lex_error lerr = lex(source, &tokens);
+  ASSERT_EQ(E_LEX_OK, lerr);
 
   const char *expected[] = {
       "a",

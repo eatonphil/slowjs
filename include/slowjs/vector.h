@@ -17,6 +17,7 @@ typedef enum {
     int index;                                                                 \
     int size;                                                                  \
     t *elements;                                                               \
+    void (*element_free)(t);                                                   \
   };                                                                           \
   typedef struct vector_##t vector_##t;                                        \
                                                                                \
@@ -104,6 +105,12 @@ typedef enum {
   }                                                                            \
                                                                                \
   static void vector_##t##_free(vector_##t *v) {                               \
+    int i;                                                                     \
+    if (v->element_free) {                                                     \
+      for (i = 0; i < v->index; i++) {                                         \
+        v->element_free(v->elements[i]);                                       \
+      }                                                                        \
+    }                                                                          \
     if (v->size) {                                                             \
       free(v->elements);                                                       \
     }                                                                          \

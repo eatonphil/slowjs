@@ -3,7 +3,7 @@
 
 #include "slowjs/vector.h"
 
-enum lex_error { E_LEX_OK, E_LEX_INIT };
+enum lex_error { E_LEX_OK, E_LEX_MALLOC };
 typedef enum lex_error lex_error;
 
 struct token {

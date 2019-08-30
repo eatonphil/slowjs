@@ -9,7 +9,8 @@
 #define PARSE_ERROR(msg, t)                                                    \
   fprintf(stderr, "%s near %d:%d.\n", msg, t.line, t.col)
 
-void token_element_free(token t) { vector_char_free(&t.string); }
+// Should probably be in lex
+void token_element_free(token *t) { vector_char_free(&t->string); }
 
 bool parse_literal(vector_token *tokens, const char *match) {
   token t = {0};
@@ -18,10 +19,13 @@ bool parse_literal(vector_token *tokens, const char *match) {
     return false;
   }
 
-  if (!strcmp(t.string.elements, match)) {
+  printf("%s,%s,%d\n", t.string.elements, match, t.string.index);
+  if (strncmp(t.string.elements, match, t.string.index) != 0) {
+    printf("here\n");
     return false;
   }
 
+  printf("there\n");
   vector_token_shift(tokens);
   return true;
 }
@@ -53,7 +57,6 @@ bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
 
 bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   int i;
@@ -66,7 +69,7 @@ bool parse_parameters(vector_token *tokens, vector_string *parameters) {
       goto failed_match;
     }
 
-    if (strcmp(t.string.elements, ")")) {
+    if (strncmp(t.string.elements, ")", 1)) {
       break;
     }
 
@@ -98,7 +101,6 @@ bool parse_expressions(vector_token *, vector_expression *);
 
 bool parse_function_call(vector_token *tokens, function_call *fc) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   expression function = {0};
@@ -145,7 +147,6 @@ bool parse_number(vector_token *tokens, double *n) {
 
 bool parse_operator(vector_token *tokens, operator*o) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   expression left = {0}, right = {0};
@@ -189,7 +190,6 @@ failed_match:
 
 bool parse_expression(vector_token *tokens, expression *e) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   vector_char id = {0};
@@ -235,7 +235,6 @@ bool parse_expression(vector_token *tokens, expression *e) {
 
 bool parse_expressions(vector_token *tokens, vector_expression *expressions) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   expression e = {0};
@@ -269,7 +268,6 @@ bool parse_declaration(vector_token *tokens, declaration *);
 
 bool parse_statement(vector_token *tokens, statement *statement) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   declaration d = {0};
@@ -303,7 +301,6 @@ failed_match:
 
 bool parse_statements(vector_token *tokens, vector_statement *statements) {
   vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
   vector_token_copy(&tokens_original, tokens->elements, tokens->index);
 
   statement s = {0};
@@ -336,10 +333,6 @@ failed_match:
 
 bool parse_function_declaration(vector_token *tokens,
                                 function_declaration *fd) {
-  vector_token tokens_original = {0};
-  tokens_original.element_free = token_element_free;
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
   if (!parse_literal(tokens, "function")) {
     goto failed_match;
   }
@@ -355,6 +348,8 @@ bool parse_function_declaration(vector_token *tokens,
     PARSE_ERROR("Expected function name", t);
     goto failed_match;
   }
+
+  vector_token_shift(tokens);
 
   if (!parse_literal(tokens, "(")) {
     PARSE_ERROR("Expected parenthesis after function name", t);
@@ -452,8 +447,6 @@ parse_error parse(vector_char source, ast *program_out) {
   int i;
   for (i = 0; i < tokens.index; i++) {
     vector_char_push(&tokens.elements[i].string, 0);
-    printf("%s:%d\n", tokens.elements[i].string.elements,
-           tokens.elements[i].string.index - 1);
   }
 
   token t = {0};

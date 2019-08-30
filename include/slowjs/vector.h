@@ -17,13 +17,14 @@ typedef enum {
     int index;                                                                 \
     int size;                                                                  \
     t *elements;                                                               \
-    void (*element_free)(t);                                                   \
+    void (*element_free)(t *);                                                 \
   };                                                                           \
   typedef struct vector_##t vector_##t;                                        \
                                                                                \
   static vector_error vector_##t##_init(vector_##t *);                         \
   static vector_error vector_##t##_resize(vector_##t *, int);                  \
   static vector_error vector_##t##_push(vector_##t *, t);                      \
+  static vector_error vector_##t##_pop(vector_##t *);                          \
   static vector_error vector_##t##_get(vector_##t *v, int, t *);               \
   static vector_error vector_##t##_copy(vector_##t *v, t *, int);              \
   static void vector_##t##_shift(vector_##t *);                                \
@@ -57,6 +58,13 @@ typedef enum {
     v->elements = new_elements;                                                \
     v->size = c;                                                               \
     return E_VECTOR_OK;                                                        \
+  }                                                                            \
+                                                                               \
+  static vector_error vector_##t##_pop(vector_##t *v) {                        \
+    v->index--;                                                                \
+    if (v->index < 0) {                                                        \
+      v->index = 0;                                                            \
+    }                                                                          \
   }                                                                            \
                                                                                \
   static vector_error vector_##t##_push(vector_##t *v, t element) {            \
@@ -100,20 +108,18 @@ typedef enum {
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
-  static void vector_##t##_shift(vector_##t *v) {                              \
-    memcpy(v->elements, v->elements + 1, v->index--);                          \
-  }                                                                            \
-                                                                               \
   static void vector_##t##_free(vector_##t *v) {                               \
     int i;                                                                     \
     if (v->element_free) {                                                     \
       for (i = 0; i < v->index; i++) {                                         \
-        v->element_free(v->elements[i]);                                       \
+        v->element_free(&v->elements[i]);                                      \
       }                                                                        \
     }                                                                          \
+                                                                               \
     if (v->size) {                                                             \
       free(v->elements);                                                       \
     }                                                                          \
+                                                                               \
     v->size = 0;                                                               \
     v->index = 0;                                                              \
   }

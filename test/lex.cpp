@@ -1,11 +1,13 @@
 #include "gtest/gtest.h"
 
+#include <stdio.h>
+
 extern "C" {
 #include "slowjs/lex.h"
 }
 
 TEST(lex, addition) {
-  const char *raw_source = "a + 1";
+  const char raw_source[] = "a + 1";
   vector_char source = {0};
 
   vector_error verr =
@@ -23,7 +25,7 @@ TEST(lex, addition) {
       "1",
   };
 
-  ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index + 1);
+  ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index);
 
   int i;
   for (i = 0; i < tokens.index; i++) {
@@ -33,7 +35,7 @@ TEST(lex, addition) {
 }
 
 TEST(lex, function) {
-  const char *raw_source = "function main() { return a + 1; }";
+  const char raw_source[] = "function main() { return a + 1; }";
   vector_char source = {0};
   vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
 
@@ -46,7 +48,7 @@ TEST(lex, function) {
       "function", "main", "(", ")", "{", "return", "a", "+", "1", ";", "}",
   };
 
-  ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index + 1);
+  ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index);
 
   int i;
   for (i = 0; i < tokens.index; i++) {

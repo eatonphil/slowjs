@@ -9,7 +9,8 @@ typedef enum {
   E_VECTOR_OK,
   E_VECTOR_INIT_ZERO,
   E_VECTOR_INIT_MALLOC,
-  E_VECTOR_OUT_OF_BOUNDS
+  E_VECTOR_OUT_OF_BOUNDS,
+  E_VECTOR_POP,
 } vector_error;
 
 #define DECLARE_VECTOR(t)                                                      \
@@ -24,10 +25,9 @@ typedef enum {
   static vector_error vector_##t##_init(vector_##t *);                         \
   static vector_error vector_##t##_resize(vector_##t *, int);                  \
   static vector_error vector_##t##_push(vector_##t *, t);                      \
-  static vector_error vector_##t##_pop(vector_##t *);                          \
-  static vector_error vector_##t##_get(vector_##t *v, int, t *);               \
-  static vector_error vector_##t##_copy(vector_##t *v, t *, int);              \
-  static void vector_##t##_shift(vector_##t *);                                \
+  static vector_error vector_##t##_pop(vector_##t *, t *);                     \
+  static vector_error vector_##t##_get(vector_##t *, int, t *);                \
+  static vector_error vector_##t##_copy(vector_##t *, t *, int);               \
   static void vector_##t##_free(vector_##t *);                                 \
                                                                                \
   static vector_error vector_##t##_init(vector_##t *v) {                       \
@@ -60,13 +60,6 @@ typedef enum {
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
-  static vector_error vector_##t##_pop(vector_##t *v) {                        \
-    v->index--;                                                                \
-    if (v->index < 0) {                                                        \
-      v->index = 0;                                                            \
-    }                                                                          \
-  }                                                                            \
-                                                                               \
   static vector_error vector_##t##_push(vector_##t *v, t element) {            \
     vector_error error;                                                        \
     if (v->size == 0) {                                                        \
@@ -89,6 +82,16 @@ typedef enum {
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
+  static vector_error vector_##t##_pop(vector_##t *v, t *element) {            \
+    if (v->index > 0) {                                                        \
+      --v->index;                                                              \
+      *element = v->elements[v->index];                                        \
+      return E_VECTOR_OK;                                                      \
+    }                                                                          \
+                                                                               \
+    return E_VECTOR_POP;                                                       \
+  }                                                                            \
+                                                                               \
   static vector_error vector_##t##_get(vector_##t *v, int index, t *out) {     \
     if (index < v->index) {                                                    \
       *out = v->elements[index];                                               \
@@ -103,7 +106,7 @@ typedef enum {
     if (error != E_VECTOR_OK) {                                                \
       return error;                                                            \
     }                                                                          \
-    memcpy(v->elements, src, c);                                               \
+    memcpy(v->elements, src, sizeof(t) * c);                                   \
     v->index = c;                                                              \
     return E_VECTOR_OK;                                                        \
   }                                                                            \

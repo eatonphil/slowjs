@@ -31,7 +31,7 @@ typedef struct value value;
 DECLARE_VECTOR(value)
 
 struct context {
-  vector_char id;
+  vector_char name;
   value value;
 };
 typedef struct context context;
@@ -45,34 +45,37 @@ interpret_error interpret_declaration(declaration, vector_context *);
 
 interpret_error interpret_function_call(function_call fc, vector_context *ctx,
                                         value *result) {
-  value function;
-  interpret_error error = interpret_expression(*fc.function, ctx, &function);
-  if (error != E_INTERPRET_OK) {
-    return E_INTERPRET_CRASH;
+  vector_context child_ctx = {0};
+  value function = {0}, v = {0};
+  vector_char p = {0};
+  context mapping = {0};
+  int i = 0;
+  interpret_error err = E_INTERPRET_OK;
+
+  err = interpret_expression(*fc.function, ctx, &function);
+  if (err != E_INTERPRET_OK) {
+    return err;
   }
 
   if (function.type != VALUE_CLOSURE) {
     return E_INTERPRET_CALL_NONFUNCTION;
   }
 
-  vector_context child_ctx;
-  if (vector_context_copy(&child_ctx, ctx->elements, ctx->index)) {
+  if (vector_context_copy(&child_ctx, ctx->elements, ctx->index) !=
+      E_VECTOR_OK) {
+    // TODO: log that main is not a function
     return E_INTERPRET_CRASH;
   }
 
-  int i;
-  value v;
-  vector_char p;
-  context mapping;
   for (i = 0; i < function.value.closure.parameters.index; i++) {
     // TODO: guard against inequal number of arguments
     p = function.value.closure.parameters.elements[i];
-    error = interpret_expression(fc.arguments->elements[i], ctx, &v);
-    if (error != E_INTERPRET_OK) {
-      return error;
+    err = interpret_expression(fc.arguments->elements[i], ctx, &v);
+    if (err != E_INTERPRET_OK) {
+      return err;
     }
 
-    mapping.id = p;
+    mapping.name = p;
     mapping.value = v;
     vector_context_push(&child_ctx, mapping);
   }
@@ -82,15 +85,17 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
 
 interpret_error interpret_operator(operator o, vector_context *ctx,
                                    value *result) {
-  value left, right;
-  interpret_error error = interpret_expression(*o.left_operand, ctx, &left);
-  if (error != E_INTERPRET_OK) {
-    return error;
+  value left = {0}, right = {0};
+  interpret_error err = E_INTERPRET_OK;
+
+  err = interpret_expression(*o.left_operand, ctx, &left);
+  if (err != E_INTERPRET_OK) {
+    return err;
   }
 
-  error = interpret_expression(*o.right_operand, ctx, &right);
-  if (error != E_INTERPRET_OK) {
-    return error;
+  err = interpret_expression(*o.right_operand, ctx, &right);
+  if (err != E_INTERPRET_OK) {
+    return err;
   }
 
   result->type = VALUE_NUMBER;
@@ -113,13 +118,16 @@ interpret_error interpret_operator(operator o, vector_context *ctx,
 
 interpret_error interpret_expression(expression e, vector_context *ctx,
                                      value *result) {
-  int i;
+  int i = 0;
+  bool matched = false;
+
   switch (e.type) {
   case EXPRESSION_IDENTIFIER:
     for (i = 0; i < ctx->index; i++) {
-      if (strncmp(ctx->elements[i].id.elements,
-                  e.expression.identifier.elements,
-                  ctx->elements[i].id.index)) {
+      matched = strncmp(ctx->elements[i].name.elements,
+                        e.expression.identifier.elements,
+                        ctx->elements[i].name.index) == 0;
+      if (matched) {
         *result = ctx->elements[i].value;
         return E_INTERPRET_OK;
       }
@@ -140,7 +148,8 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
 
 interpret_error interpret_statement(statement s, vector_context *ctx,
                                     value *result) {
-  value nothing;
+  value nothing = {0};
+
   switch (s.type) {
   case STATEMENT_RETURN:
     return interpret_expression(s.statement.ret, ctx, result);
@@ -153,12 +162,13 @@ interpret_error interpret_statement(statement s, vector_context *ctx,
 
 interpret_error interpret_statements(vector_statement body, vector_context *ctx,
                                      value *result) {
-  int i;
-  interpret_error error;
+  int i = 0;
+  interpret_error err = E_INTERPRET_OK;
+
   for (i = 0; i < body.index; i++) {
-    error = interpret_statement(body.elements[i], ctx, result);
-    if (error != E_INTERPRET_OK) {
-      return error;
+    err = interpret_statement(body.elements[i], ctx, result);
+    if (err != E_INTERPRET_OK) {
+      return err;
     }
   }
 
@@ -167,10 +177,20 @@ interpret_error interpret_statements(vector_statement body, vector_context *ctx,
 
 interpret_error interpret_function_declaration(function_declaration fd,
                                                vector_context *ctx) {
-  closure c = {ctx, fd.parameters, fd.body};
-  value v = {VALUE_CLOSURE};
+  closure c = {0};
+  value v = {0};
+  context mapping = {0};
+
+  c.ctx = ctx;
+  c.parameters = fd.parameters;
+  c.body = fd.body;
+
   v.value.closure = c;
-  context mapping = {fd.name, v};
+  v.type = VALUE_CLOSURE;
+
+  mapping.name = fd.name;
+  mapping.value = v;
+
   return (interpret_error)vector_context_push(ctx, mapping);
 }
 
@@ -183,25 +203,46 @@ interpret_error interpret_declaration(declaration d, vector_context *ctx) {
   return E_INTERPRET_CRASH;
 }
 
-interpret_error interpret(ast program) {
-  interpret_error error;
-  int i;
-  declaration d;
-  function_declaration main;
-  bool found_main = false;
+interpret_error call_main(vector_context *ctx, function_declaration *main) {
+  expression function = {0};
+  vector_expression arguments = {0};
+  value v = {0};
+  function_call fc = {0};
+  interpret_error err = E_INTERPRET_OK;
 
-  vector_context ctx;
+  function.type = EXPRESSION_IDENTIFIER;
+  vector_char_copy(&function.expression.identifier, "main", 4);
+
+  fc.function = &function;
+  fc.arguments = &arguments;
+
+  err = interpret_function_call(fc, ctx, &v);
+  if (err != E_INTERPRET_OK) {
+    return err;
+  }
+
+  printf("%lf\n", v.value.number);
+  return E_INTERPRET_OK;
+}
+
+interpret_error interpret(ast program) {
+  vector_context ctx = {0};
+  declaration d = {0};
+  function_declaration main = {0};
+  int i = 0;
+  interpret_error err = E_INTERPRET_OK;
+  bool found_main = false, matched = false;
 
   for (i = 0; i < program.declarations.index; i++) {
     d = program.declarations.elements[i];
 
-    error = interpret_declaration(d, &ctx);
-    if (error != E_INTERPRET_OK) {
-      return error;
+    err = interpret_declaration(d, &ctx);
+    if (err != E_INTERPRET_OK) {
+      return err;
     }
 
-    if (d.type == DECLARATION_FUNCTION &&
-        strcmp(d.declaration.function.name.elements, "main")) {
+    matched = strncmp(d.declaration.function.name.elements, "main", 4) == 0;
+    if (d.type == DECLARATION_FUNCTION && matched) {
       main = d.declaration.function;
       found_main = true;
     }
@@ -212,17 +253,5 @@ interpret_error interpret(ast program) {
     return E_INTERPRET_NO_MAIN;
   }
 
-  expression function;
-  function.type = EXPRESSION_IDENTIFIER;
-  vector_char_copy(&function.expression.identifier, "main", 4);
-  vector_expression arguments;
-  function_call fc = {&function, &arguments};
-  value v;
-  error = interpret_function_call(fc, &ctx, &v);
-  if (error != E_INTERPRET_OK) {
-    return error;
-  }
-  printf("%lf\n", v.value.number);
-
-  return E_INTERPRET_OK;
+  return call_main(&ctx, &main);
 }

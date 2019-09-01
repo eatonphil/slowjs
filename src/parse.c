@@ -7,157 +7,208 @@
 #include "slowjs/lex.h"
 
 #define PARSE_ERROR(msg, t)                                                    \
-  fprintf(stderr, "%s near %d:%d.\n", msg, t.line, t.col)
+  fprintf(stderr, "%s near \"%s\" at %d:%d.\n", msg, t.string.elements,        \
+          t.line, t.col - t.string.index)
 
-// Should probably be in lex
-void token_element_free(token *t) { vector_char_free(&t->string); }
+#define PUSH(tokens, t, err)                                                   \
+  err = vector_token_push(tokens, t);                                          \
+  if (err != E_VECTOR_OK) {                                                    \
+    PARSE_ERROR("Failed to restore token", t);                                 \
+    return false;                                                              \
+  }
+
+#define STORE_TOKENS_COPY(tokens, copy, err)                                   \
+  err = vector_token_copy(copy, (tokens)->elements, (tokens)->index);          \
+  if (err != E_VECTOR_OK) {                                                    \
+    LOG_ERROR("parse", "Failed to copy tokens", 0);                            \
+    return false;                                                              \
+  }
+
+#define RESTORE_TOKENS_COPY(tokens, copy, err)                                 \
+  STORE_TOKENS_COPY(copy, tokens, err)                                         \
+  vector_token_free(copy);
+
+bool parse_declaration(vector_token *, declaration *);
+bool parse_number(vector_token *, double *);
+bool parse_literal(vector_token *, const char *);
+bool parse_identifier(vector_token *, vector_char *);
+bool parse_parameters(vector_token *, vector_string *);
+bool parse_function_call(vector_token *, function_call *);
+bool parse_operator(vector_token *, operator*);
+bool parse_expression(vector_token *, expression *);
+bool parse_expressions(vector_token *, vector_expression *);
+bool parse_statement(vector_token *, statement *);
+bool parse_block(vector_token *, vector_statement *);
+bool parse_function_declaration(vector_token *, function_declaration *);
+bool parse_const_declaration(vector_token *, vector_variable_declaration *);
+bool parse_let_declaration(vector_token *, vector_variable_declaration *);
+bool parse_var_declaration(vector_token *, vector_variable_declaration *);
+bool parse_declaration(vector_token *, declaration *);
+
+bool parse_number(vector_token *tokens, double *n) {
+  token t = {0};
+  token *tp = 0;
+  char *notfound = 0;
+  int err = E_PARSE_OK;
+
+  err = vector_token_pop(tokens, tp);
+  if (tp == 0) {
+    goto cleanup; // EOF?
+  }
+
+  t = *tp;
+
+  *n = strtod(t.string.elements, &notfound);
+  if (t.string.elements != notfound) {
+    return true;
+  }
+
+cleanup:
+  PUSH(tokens, t, err);
+  return false;
+}
 
 bool parse_literal(vector_token *tokens, const char *match) {
   token t = {0};
-  int error = vector_token_get(tokens, 0, &t);
-  if (error != E_VECTOR_OK) {
-    return false;
+  vector_error err = E_VECTOR_OK;
+  bool matched = false;
+
+  err = vector_token_pop(tokens, &t);
+  if (err == E_VECTOR_POP) {
+    goto cleanup;
   }
 
-  printf("%s,%s,%d\n", t.string.elements, match, t.string.index);
-  if (strncmp(t.string.elements, match, t.string.index) != 0) {
-    printf("here\n");
-    return false;
+  matched = strncmp(t.string.elements, match, t.string.index) == 0;
+  if (!matched) {
+    goto cleanup;
   }
 
-  printf("there\n");
-  vector_token_shift(tokens);
   return true;
+
+cleanup:
+  PUSH(tokens, t, err);
+  return false;
 }
 
 bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
+  int i = 0;
+  char c = 0;
   token t = {0};
-  if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
-    return false;
+  vector_error err = vector_token_pop(tokens, &t);
+  if (err == E_VECTOR_POP) {
+    goto cleanup;
   }
-
-  int i;
-  char c;
 
   for (i = 0; i < t.string.index; i++) {
     c = t.string.elements[i];
+
+    // Can start with [$_a-Z]
     if (c != '$' && c != '_' &&
         !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
       continue;
     }
 
-    if (i == 0 || !(c >= '0' && c <= '9')) {
-      return false;
+    if (i > 0 && c >= '0' && c <= '9') {
+      continue;
     }
+
+    goto cleanup;
   }
 
-  vector_token_shift(tokens);
   return true;
+
+cleanup:
+  PUSH(tokens, t, err);
+  return false;
 }
 
 bool parse_parameters(vector_token *tokens, vector_string *parameters) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
-  int i;
-  token t = {0};
-  char c;
   vector_char parameter = {0};
+  vector_token copy = {0};
+  token t = {0};
+  int i = 0, err = 0;
+  char c = 0;
+  bool matched = false;
+
+  STORE_TOKENS_COPY(tokens, &copy, err);
 
   while (true) {
-    if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
-      goto failed_match;
+    err = vector_token_pop(tokens, &t);
+    if (err != E_VECTOR_OK) {
+      goto cleanup;
     }
 
-    if (strncmp(t.string.elements, ")", 1)) {
+    matched = strncmp(t.string.elements, ")", 1) == 0;
+    if (matched) {
       break;
     }
 
     if (parameters->index > 0 && !parse_literal(tokens, ",")) {
       PARSE_ERROR("Expected comma after parameter", t);
-      goto failed_match;
+      goto cleanup;
     }
 
     if (!parse_identifier(tokens, &parameter)) {
       PARSE_ERROR("Invalid identifier", t);
-      goto failed_match;
+      goto cleanup;
     }
 
     if (vector_string_push(parameters, parameter) != E_VECTOR_OK) {
-      goto failed_match;
+      goto cleanup;
     }
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
-bool parse_expression(vector_token *, expression *);
-bool parse_expressions(vector_token *, vector_expression *);
-
 bool parse_function_call(vector_token *tokens, function_call *fc) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
+  vector_expression expressions = {0};
+  vector_token copy = {0};
   expression function = {0};
+  int err = E_PARSE_OK;
+
+  STORE_TOKENS_COPY(tokens, &copy, err);
+
   if (!parse_expression(tokens, &function)) {
-    goto failed_match;
+    goto cleanup;
   }
 
   if (!parse_literal(tokens, "(")) {
-    goto failed_match;
+    goto cleanup;
   }
 
-  vector_expression expressions = {0};
   if (!parse_expressions(tokens, &expressions)) {
-    goto failed_match;
+    goto cleanup;
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
-  return false;
-}
-
-bool parse_number(vector_token *tokens, double *n) {
-  char *notfound;
-  token t = {0};
-
-  if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
-    return false;
-  }
-
-  // 0 pad the string
-  vector_char_push(&t.string, 0);
-
-  *n = strtod(t.string.elements, &notfound);
-  if (t.string.elements != notfound) {
-    vector_token_shift(tokens);
-    return true;
-  }
-
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
 bool parse_operator(vector_token *tokens, operator*o) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
+  vector_token copy = {0};
   expression left = {0}, right = {0};
+  token t = {0};
+  int err = E_PARSE_OK;
+
+  STORE_TOKENS_COPY(tokens, &copy, err);
+
   if (!parse_expression(tokens, &left)) {
-    goto failed_match;
+    goto cleanup;
   }
 
-  token t = {0};
   if (!(o->left_operand = malloc(sizeof(expression))) ||
       !(o->right_operand = malloc(sizeof(expression)))) {
-    goto failed_match;
+    goto cleanup;
   }
   memcpy(o->left_operand, &left, sizeof(expression));
   memcpy(o->right_operand, &right, sizeof(expression));
@@ -171,105 +222,110 @@ bool parse_operator(vector_token *tokens, operator*o) {
   } else if (parse_literal(tokens, "/")) {
     o->type = OPERATOR_DIV;
   } else {
-    vector_token_get(tokens, 0, &t);
+    vector_token_pop(tokens, &t);
     PARSE_ERROR("Invalid operator", t);
-    goto failed_match;
+    goto cleanup;
   }
 
   if (!parse_expression(tokens, &right)) {
-    goto failed_match;
+    goto cleanup;
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
 bool parse_expression(vector_token *tokens, expression *e) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
+  vector_token copy = {0};
   vector_char id = {0};
-  if (parse_identifier(tokens, &id)) {
-    e->type = EXPRESSION_IDENTIFIER;
-    e->expression.identifier = id;
-    return true;
-  }
-
-  double n;
-  if (parse_number(tokens, &n)) {
-    e->type = EXPRESSION_NUMBER;
-    e->expression.number = n;
-  }
-
   function_call fc = {0};
-  if (parse_function_call(tokens, &fc)) {
-    e->type = EXPRESSION_CALL;
-    e->expression.function_call = fc;
-    return true;
-  }
-
   operator o = {0};
-  if (parse_operator(tokens, &o)) {
-    e->type = EXPRESSION_OPERATOR;
-    e->expression.operator= o;
-    return true;
-  }
+  double n = 0;
+  vector_error err = E_VECTOR_OK;
 
+  printf("here? ofoofoo\n");
   if (parse_literal(tokens, "(")) {
+    STORE_TOKENS_COPY(tokens, &copy, err);
+
     if (parse_expression(tokens, e)) {
       if (parse_literal(tokens, ")")) {
         return true;
       }
     }
 
-    vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-    vector_token_free(&tokens_original);
+    RESTORE_TOKENS_COPY(tokens, &copy, err);
+    return false;
+  }
+
+  printf("here? ofoofoo\n");
+  if (parse_identifier(tokens, &id)) {
+    printf("here? ofoofoo222\n");
+    e->type = EXPRESSION_IDENTIFIER;
+    e->expression.identifier = id;
+    return true;
+  }
+
+  printf("here? ofoofoo\n");
+  if (parse_function_call(tokens, &fc)) {
+    e->type = EXPRESSION_CALL;
+    e->expression.function_call = fc;
+    return true;
+  }
+
+  printf("here? ofoofoo\n");
+  if (parse_operator(tokens, &o)) {
+    e->type = EXPRESSION_OPERATOR;
+    e->expression.operator= o;
+    return true;
+  }
+
+  if (parse_number(tokens, &n)) {
+    e->type = EXPRESSION_NUMBER;
+    e->expression.number = n;
+    return true;
   }
 
   return false;
 }
 
 bool parse_expressions(vector_token *tokens, vector_expression *expressions) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
+  vector_token copy = {0};
   expression e = {0};
+  int err = E_PARSE_OK;
+
+  STORE_TOKENS_COPY(tokens, &copy, err);
+
   while (true) {
     if (parse_literal(tokens, ")")) {
       break;
     }
 
     if (expressions->index > 0 && !parse_literal(tokens, ",")) {
-      goto failed_match;
+      goto cleanup;
     }
 
     if (!parse_expression(tokens, &e)) {
-      goto failed_match;
+      goto cleanup;
     }
 
     if (vector_expression_push(expressions, e) != E_VECTOR_OK) {
-      goto failed_match;
+      goto cleanup;
     }
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
-bool parse_declaration(vector_token *tokens, declaration *);
-
 bool parse_statement(vector_token *tokens, statement *statement) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
   declaration d = {0};
   expression e = {0};
 
@@ -277,109 +333,110 @@ bool parse_statement(vector_token *tokens, statement *statement) {
     statement->type = STATEMENT_DECLARATION;
     statement->statement.declaration = malloc(sizeof(declaration));
     if (statement->statement.declaration == 0) {
-      goto failed_match;
+      return false;
     }
 
     memcpy(statement->statement.declaration, &d, sizeof(declaration));
-  } else if (parse_expression(tokens, &e)) {
-    statement->type = STATEMENT_EXPRESSION;
-    statement->statement.expression = e;
-  } else if (parse_literal(tokens, "return") && parse_expression(tokens, &e)) {
-    statement->type = STATEMENT_RETURN;
-    statement->statement.ret = e;
-  } else {
-    goto failed_match;
+    return true;
   }
 
-  return true;
+  if (parse_literal(tokens, "return") && parse_expression(tokens, &e)) {
+    statement->type = STATEMENT_RETURN;
+    statement->statement.ret = e;
+    return true;
+  }
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+  if (parse_expression(tokens, &e)) {
+    statement->type = STATEMENT_EXPRESSION;
+    statement->statement.expression = e;
+    return true;
+  }
+
   return false;
 }
 
-bool parse_statements(vector_token *tokens, vector_statement *statements) {
-  vector_token tokens_original = {0};
-  vector_token_copy(&tokens_original, tokens->elements, tokens->index);
-
+bool parse_block(vector_token *tokens, vector_statement *statements) {
+  vector_token copy = {0};
   statement s = {0};
+  int err = E_PARSE_OK;
 
+  STORE_TOKENS_COPY(tokens, &copy, err);
+
+  printf("here now?\n");
   while (true) {
     if (parse_literal(tokens, "}")) {
       break;
     }
 
     if (statements->index > 0 && !parse_literal(tokens, ";")) {
-      goto failed_match;
+      goto cleanup;
     }
 
+    printf("here now now?\n");
     if (!parse_statement(tokens, &s)) {
-      goto failed_match;
+      goto cleanup;
     }
 
     if (vector_statement_push(statements, s) != E_VECTOR_OK) {
-      goto failed_match;
+      goto cleanup;
     }
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
 bool parse_function_declaration(vector_token *tokens,
                                 function_declaration *fd) {
+  vector_token copy = {0};
+  token t = {0};
+  int err = E_PARSE_OK;
+
+  STORE_TOKENS_COPY(tokens, &copy, err);
+
   if (!parse_literal(tokens, "function")) {
-    goto failed_match;
+    goto cleanup;
   }
 
-  token t = {0};
-  if (vector_token_get(tokens, 0, &t) != E_VECTOR_OK) {
+  if (vector_token_pop(tokens, &t) != E_VECTOR_OK) {
     PARSE_ERROR("Expected function name", t);
-    goto failed_match;
+    goto cleanup;
   }
 
   if (vector_char_copy(&fd->name, t.string.elements, t.string.index) !=
       E_VECTOR_OK) {
     PARSE_ERROR("Expected function name", t);
-    goto failed_match;
+    goto cleanup;
   }
-
-  vector_token_shift(tokens);
 
   if (!parse_literal(tokens, "(")) {
     PARSE_ERROR("Expected parenthesis after function name", t);
-    goto failed_match;
+    goto cleanup;
   }
 
   if (!parse_parameters(tokens, &fd->parameters)) {
     PARSE_ERROR("Expected parameters", t);
-    goto failed_match;
-  }
-
-  if (!parse_literal(tokens, ")")) {
-    PARSE_ERROR("Expected closing parenthesis", t);
-    goto failed_match;
+    goto cleanup;
   }
 
   if (!parse_literal(tokens, "{")) {
     PARSE_ERROR("Expected opening brace", t);
-    goto failed_match;
+    goto cleanup;
   }
 
-  if (!parse_statements(tokens, &fd->body)) {
-    goto failed_match;
+  if (!parse_block(tokens, &fd->body)) {
+    goto cleanup;
   }
 
+  vector_token_free(&copy);
   return true;
 
-failed_match:
-  vector_token_copy(tokens, tokens_original.elements, tokens_original.index);
-  vector_token_free(&tokens_original);
+cleanup:
+  RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }
 
@@ -417,59 +474,64 @@ bool parse_declaration(vector_token *tokens, declaration *d) {
   if (parse_function_declaration(tokens, &fd)) {
     d->type = DECLARATION_FUNCTION;
     d->declaration.function = fd;
-  } else if (parse_const_declaration(tokens, &vd)) {
-    d->type = DECLARATION_CONST;
-    d->declaration.variable_list = vd;
-  } else if (parse_let_declaration(tokens, &vd)) {
-    d->type = DECLARATION_LET;
-    d->declaration.variable_list = vd;
-  } else if (parse_var_declaration(tokens, &vd)) {
-    d->type = DECLARATION_VAR;
-    d->declaration.variable_list = vd;
-  } else {
-    return false;
+    return true;
   }
 
-  return true;
+  if (parse_const_declaration(tokens, &vd)) {
+    d->type = DECLARATION_CONST;
+    d->declaration.variable_list = vd;
+    return true;
+  }
+
+  if (parse_let_declaration(tokens, &vd)) {
+    d->type = DECLARATION_LET;
+    d->declaration.variable_list = vd;
+    return true;
+  }
+
+  if (parse_var_declaration(tokens, &vd)) {
+    d->type = DECLARATION_VAR;
+    d->declaration.variable_list = vd;
+    return true;
+  }
+
+  return false;
 }
 
 parse_error parse(vector_char source, ast *program_out) {
-  parse_error error = E_PARSE_OK;
-
   vector_token tokens = {0};
-  tokens.element_free = token_element_free;
-  error = (parse_error)lex(source, &tokens);
-  if (error != E_LEX_OK) {
-    LOG_ERROR("lex", "Error during initialization", error);
-    goto cleanup_lex;
-  }
-
-  int i;
-  for (i = 0; i < tokens.index; i++) {
-    vector_char_push(&tokens.elements[i].string, 0);
-  }
-
-  token t = {0};
-  if (!tokens.index) {
-    PARSE_ERROR("Program is empty", t);
-    error = E_PARSE_EMPTY;
-    goto cleanup_lex;
-  }
-
   declaration d = {0};
+  parse_error err = E_PARSE_OK;
+
+  tokens.element_free = token_element_free;
+  err = (parse_error)lex(source, &tokens);
+  if (err != E_LEX_OK) {
+    LOG_ERROR("lex", "Error during initialization", err);
+    goto cleanup;
+  }
+
+  if (!tokens.index) {
+    LOG_ERROR("parse", "Program is empty", 0);
+    err = E_PARSE_EMPTY;
+    goto cleanup;
+  }
 
   while (tokens.index) {
     d = (declaration){0};
     if (!parse_declaration(&tokens, &d)) {
-      PARSE_ERROR("Expected top-level declaration", tokens.elements[0]);
-      error = E_PARSE_TOPLEVEL_DECLARATION;
-      goto cleanup_lex;
+      LOG_ERROR("parse", "Expected top-level declaration", 0);
+      err = E_PARSE_TOPLEVEL_DECLARATION;
+      goto cleanup;
     }
-    vector_declaration_push(&program_out->declarations, d);
+
+    err = (parse_error)vector_declaration_push(&program_out->declarations, d);
+    if (err != E_VECTOR_OK) {
+      LOG_ERROR("parse", "Failed storing declaration", 0);
+      goto cleanup;
+    }
   }
 
-cleanup_lex:
-cleanup_init:
+cleanup:
   vector_token_free(&tokens);
-  return error;
+  return err;
 }

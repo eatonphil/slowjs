@@ -3,10 +3,11 @@
 #include "slowjs/lex.h"
 
 void function_call_free(function_call *fc) {
+  int i = 0;
+
   expression_free(fc->function);
   free(fc->function);
 
-  int i;
   for (i = 0; i < fc->arguments->index; i++) {
     expression_free(&fc->arguments->elements[i]);
     free(fc->arguments);
@@ -57,17 +58,18 @@ void statement_free(statement *s) {
 }
 
 void function_declaration_free(function_declaration *fd) {
+  int i = 0;
+
   vector_char_free(&fd->name);
   vector_string_free(&fd->parameters);
 
-  int i;
   for (i = 0; i < fd->body.index; i++) {
     statement_free(&fd->body.elements[i]);
   }
 }
 
 void declaration_free(declaration *d) {
-  int i;
+  int i = 0;
 
   switch (d->type) {
   case DECLARATION_FUNCTION:
@@ -81,7 +83,8 @@ void declaration_free(declaration *d) {
 }
 
 void ast_free(ast *a) {
-  int i;
+  int i = 0;
+
   for (i = 0; i < a->declarations.index; i++) {
     declaration_free(&a->declarations.elements[i]);
   }

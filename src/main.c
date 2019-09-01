@@ -10,10 +10,13 @@
 #include "slowjs/parse.h"
 #include "slowjs/vector.h"
 
+void generate_backtrace(int);
+void register_backtraces();
+
 // SOURCE: https://stackoverflow.com/a/77336/1507139
-void generateBacktrace(int sig) {
-  void *array[10];
-  size_t size;
+void generate_backtrace(int sig) {
+  void *array[10] = {0};
+  size_t size = 0;
 
   // get void*'s for all entries on the stack
   size = backtrace(array, 10);
@@ -24,37 +27,41 @@ void generateBacktrace(int sig) {
   exit(1);
 }
 
-int main(int argc, char **argv) {
+void register_backtraces() {
   struct sigaction action = {0};
-  action.sa_handler = generateBacktrace;
+
+  action.sa_handler = generate_backtrace;
   if (sigaction(SIGSEGV, &action, NULL) < 0) {
     printf("Unable to register segfault handler.\n");
-    return 1;
+    exit(1);
   }
+}
+
+int main(int argc, char **argv) {
+  ast program = {0};
+  vector_char source = {0};
+  int err = 0;
+
+  register_backtraces();
 
   if (argc != 2) {
     printf("Expected a JavaScript file argument, got nothing.");
     return 1;
   }
 
-  vector_char source = {0};
-  int error = read_file(argv[1], &source);
-  if (error != E_FILE_OK) {
-    error = error;
+  err = read_file(argv[1], &source);
+  if (err != E_FILE_OK) {
     goto cleanup_file;
   }
 
-  ast program = {0};
-  error = parse(source, &program);
-  if (error != E_PARSE_OK) {
-    error = error;
+  err = parse(source, &program);
+  if (err != E_PARSE_OK) {
     goto cleanup_parse;
   }
 
-  error = interpret(program);
-  if (error != E_INTERPRET_OK) {
+  err = interpret(program);
+  if (err != E_INTERPRET_OK) {
     printf("Error interpreting program.\n");
-    error = error;
     goto cleanup_interpret;
   }
 
@@ -63,5 +70,5 @@ cleanup_interpret:
 cleanup_parse:
   vector_char_free(&source);
 cleanup_file:
-  return error;
+  return err;
 }

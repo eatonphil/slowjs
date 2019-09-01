@@ -6,13 +6,18 @@
 
 #define LEX_ERROR(msg, t) fprintf(stderr, "%s near %d:%d\n", msg, t.line, t.col)
 
+vector_error vector_token_push_char(vector_token *, int, int, char);
+lex_error reverse_tokens_and_null_terminate(vector_token *);
+
 vector_error vector_token_push_char(vector_token *v, int line, int col,
                                     char c) {
   token t = {0};
+  vector_error err = E_VECTOR_OK;
+
   t.col = col;
   t.line = line;
 
-  vector_error err = vector_char_copy(&t.string, &c, 1);
+  err = vector_char_copy(&t.string, &c, 1);
   if (err != E_VECTOR_OK) {
     return err;
   }
@@ -20,14 +25,41 @@ vector_error vector_token_push_char(vector_token *v, int line, int col,
   return vector_token_push(v, t);
 }
 
-lex_error lex(vector_char source, vector_token *tokens_out) {
+lex_error reverse_tokens_and_null_terminate(vector_token *tokens_out) {
+  vector_token copy = {0};
+  int i = 0;
   lex_error err = E_LEX_OK;
 
-  char c;
-  int i;
-  bool in_comment = false;
+  err = (lex_error)vector_token_copy(&copy, tokens_out->elements,
+                                     tokens_out->index);
+  if (err != E_VECTOR_OK) {
+    LEX_ERROR("Error copying for reversal", tokens_out->elements[0]);
+    return err;
+  }
 
+  for (i = 0; i < copy.index; i++) {
+    // Null-terminate all tokens
+    err = (lex_error)vector_char_push(&copy.elements[i].string, 0);
+    if (err != E_VECTOR_OK) {
+      LEX_ERROR("Error null-terminating tokens", copy.elements[i]);
+      break;
+    }
+
+    // Reverse the tokens to form a stack.
+    memcpy(&tokens_out->elements[copy.index - i - 1], &copy.elements[i],
+           sizeof(token));
+  }
+
+  vector_token_free(&copy);
+  return err;
+}
+
+lex_error lex(vector_char source, vector_token *tokens_out) {
   token current = {0};
+  lex_error err = E_LEX_OK;
+  char c = 0;
+  int i = 0;
+  bool in_comment = false;
 
   for (i = 0; i < source.index; i++) {
     c = source.elements[i];
@@ -35,6 +67,8 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     if (c == '\n') {
       in_comment = false;
       current.line++;
+      continue;
+    } else if (c == 0) {
       continue;
     } else {
       current.col++;
@@ -51,6 +85,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
 
     switch (c) {
     case ' ':
+    case '\r':
     case '\t':
       if (!current.string.index) {
         continue;
@@ -59,10 +94,10 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
       err = (lex_error)vector_token_push(tokens_out, current);
       if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
-        goto cleanup_loop;
+        return err;
       }
 
-      current = (token){0};
+      current.string = (vector_char){0};
       break;
     case '{':
     case '}':
@@ -86,25 +121,24 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
           LEX_ERROR("Error lexing", current);
         }
 
-        current = (token){0};
+        current.string = (vector_char){0};
       }
 
       err = (lex_error)vector_token_push_char(tokens_out, current.line,
                                               current.col, c);
       if (err != E_VECTOR_OK) {
         LEX_ERROR("Error lexing", current);
-        goto cleanup_loop;
+        return err;
       }
+
+      current.string = (vector_char){0};
 
       break;
     default:
-      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-          (c >= '0' && c <= '9')) {
-        err = (lex_error)vector_char_push(&current.string, c);
-        if (err != E_VECTOR_OK) {
-          LEX_ERROR("Error lexing", current);
-          goto cleanup_loop;
-        }
+      err = (lex_error)vector_char_push(&current.string, c);
+      if (err != E_VECTOR_OK) {
+        LEX_ERROR("Error lexing", current);
+        return err;
       }
 
       break;
@@ -118,7 +152,5 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
     }
   }
 
-cleanup_loop:
-cleanup_init:
-  return err;
+  return reverse_tokens_and_null_terminate(tokens_out);
 }

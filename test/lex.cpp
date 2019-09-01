@@ -1,58 +1,54 @@
 #include "gtest/gtest.h"
 
-#include <stdio.h>
-
 extern "C" {
 #include "slowjs/lex.h"
 }
 
 TEST(lex, addition) {
-  const char raw_source[] = "a + 1";
+  vector_token tokens = {0};
   vector_char source = {0};
+  const char raw_source[] = "a + 1";
+  const char *expected[] = {
+      "1",
+      "+",
+      "a",
+  };
+  int i = 0;
+  vector_error verr = E_VECTOR_OK;
+  lex_error lerr = E_LEX_OK;
 
-  vector_error verr =
-      vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
+  verr = vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
   ASSERT_EQ(E_VECTOR_OK, verr);
 
-  vector_token tokens = {0};
-
-  lex_error lerr = lex(source, &tokens);
+  lerr = lex(source, &tokens);
   ASSERT_EQ(E_LEX_OK, lerr);
-
-  const char *expected[] = {
-      "a",
-      "+",
-      "1",
-  };
 
   ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index);
 
-  int i;
   for (i = 0; i < tokens.index; i++) {
-    vector_char_push(&tokens.elements[i].string, 0);
     ASSERT_STREQ(expected[i], tokens.elements[i].string.elements);
   }
 }
 
 TEST(lex, function) {
-  const char raw_source[] = "function main() { return a + 1; }";
-  vector_char source = {0};
-  vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
-
-  vector_token tokens = {0};
-  lex_error err = lex(source, &tokens);
-
-  ASSERT_EQ(E_LEX_OK, err);
-
+  const char raw_source[] = "function main() { return a+1; }";
   const char *expected[] = {
-      "function", "main", "(", ")", "{", "return", "a", "+", "1", ";", "}",
+      "}", ";", "1", "+", "a", "return", "{", ")", "(", "main", "function",
   };
+  vector_token tokens = {0};
+  vector_char source = {0};
+  int i = 0;
+  lex_error lerr = E_LEX_OK;
+  vector_error verr = E_VECTOR_OK;
 
+  verr = vector_char_copy(&source, (char *)raw_source, sizeof(raw_source));
+  ASSERT_EQ(E_VECTOR_OK, verr);
+
+  lerr = lex(source, &tokens);
+  ASSERT_EQ(E_LEX_OK, lerr);
   ASSERT_EQ(sizeof expected / sizeof expected[0], tokens.index);
 
-  int i;
   for (i = 0; i < tokens.index; i++) {
-    vector_char_push(&tokens.elements[i].string, 0);
     ASSERT_STREQ(expected[i], tokens.elements[i].string.elements);
   }
 }

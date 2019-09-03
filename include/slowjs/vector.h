@@ -1,33 +1,36 @@
 #ifndef _VECTOR_H_
 #define _VECTOR_H_
 
-#include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define MIN(a, b) a < b ? a : b
 
 typedef enum {
   E_VECTOR_OK,
   E_VECTOR_INIT_ZERO,
   E_VECTOR_INIT_MALLOC,
   E_VECTOR_OUT_OF_BOUNDS,
+  E_VECTOR_TOO_BIG,
   E_VECTOR_POP,
 } vector_error;
 
 #define DECLARE_VECTOR(t)                                                      \
   struct vector_##t {                                                          \
-    int index;                                                                 \
-    int size;                                                                  \
+    uint64_t index;                                                            \
+    uint64_int size;                                                           \
     t *elements;                                                               \
     void (*element_free)(t *);                                                 \
   };                                                                           \
   typedef struct vector_##t vector_##t;                                        \
                                                                                \
   static vector_error vector_##t##_init(vector_##t *);                         \
-  static vector_error vector_##t##_resize(vector_##t *, int);                  \
+  static vector_error vector_##t##_resize(vector_##t *, uint64_t);             \
   static vector_error vector_##t##_push(vector_##t *, t);                      \
   static vector_error vector_##t##_pop(vector_##t *, t *);                     \
-  static vector_error vector_##t##_get(vector_##t *, int, t *);                \
-  static vector_error vector_##t##_copy(vector_##t *, t *, int);               \
+  static vector_error vector_##t##_get(vector_##t *, uint64_t, t *);           \
+  static vector_error vector_##t##_copy(vector_##t *, t *, uint64_t);          \
   static void vector_##t##_free(vector_##t *);                                 \
                                                                                \
   static vector_error vector_##t##_init(vector_##t *v) {                       \
@@ -44,8 +47,10 @@ typedef enum {
     return E_VECTOR_OK;                                                        \
   }                                                                            \
                                                                                \
-  static vector_error vector_##t##_resize(vector_##t *v, int c) {              \
-    t *new_elements = (t *)malloc(sizeof(t) * c);                              \
+  static vector_error vector_##t##_resize(vector_##t *v, uint64_t c) {         \
+    t *new_elements = 0;                                                       \
+                                                                               \
+    new_elements = (t *)malloc(sizeof(t) * c);                                 \
     if (new_elements == 0) {                                                   \
       return E_VECTOR_INIT_MALLOC;                                             \
     }                                                                          \
@@ -61,19 +66,26 @@ typedef enum {
   }                                                                            \
                                                                                \
   static vector_error vector_##t##_push(vector_##t *v, t element) {            \
-    vector_error error;                                                        \
-    if (v->size == 0) {                                                        \
-      error = vector_##t##_init(v);                                            \
+    uint64_t newsize = 0;                                                      \
+    vector_error err = E_VECTOR_OK;                                            \
                                                                                \
-      if (error != E_VECTOR_OK) {                                              \
-        return error;                                                          \
+    if (v->size == 0) {                                                        \
+      err = vector_##t##_init(v);                                              \
+                                                                               \
+      if (err != E_VECTOR_OK) {                                                \
+        return err;                                                            \
       }                                                                        \
     }                                                                          \
                                                                                \
     if (v->index > v->size / 2) {                                              \
-      error = vector_##t##_resize(v, v->size * 2);                             \
-      if (error != E_VECTOR_OK) {                                              \
-        return error;                                                          \
+      newsize = MIN(v->size * 2, (uint64_t)(-1));                              \
+      if (newsize == v->size) {                                                \
+        return E_VECTOR_TOO_BIG;                                               \
+      }                                                                        \
+                                                                               \
+      err = vector_##t##_resize(v, newsize);                                   \
+      if (err != E_VECTOR_OK) {                                                \
+        return err;                                                            \
       }                                                                        \
     }                                                                          \
                                                                                \
@@ -92,7 +104,8 @@ typedef enum {
     return E_VECTOR_POP;                                                       \
   }                                                                            \
                                                                                \
-  static vector_error vector_##t##_get(vector_##t *v, int index, t *out) {     \
+  static vector_error vector_##t##_get(vector_##t *v, uint64_t index,          \
+                                       t *out) {                               \
     if (index < v->index) {                                                    \
       *out = v->elements[index];                                               \
       return E_VECTOR_OK;                                                      \
@@ -101,10 +114,12 @@ typedef enum {
     return E_VECTOR_OUT_OF_BOUNDS;                                             \
   }                                                                            \
                                                                                \
-  static vector_error vector_##t##_copy(vector_##t *v, t *src, int c) {        \
-    vector_error error = vector_##t##_resize(v, c);                            \
-    if (error != E_VECTOR_OK) {                                                \
-      return error;                                                            \
+  static vector_error vector_##t##_copy(vector_##t *v, t *src, uint64_t c) {   \
+    vector_error err = E_VECTOR_OK;                                            \
+                                                                               \
+    err = vector_##t##_resize(v, c);                                           \
+    if (err != E_VECTOR_OK) {                                                  \
+      return err;                                                              \
     }                                                                          \
     memcpy(v->elements, src, sizeof(t) * c);                                   \
     v->index = c;                                                              \
@@ -112,7 +127,7 @@ typedef enum {
   }                                                                            \
                                                                                \
   static void vector_##t##_free(vector_##t *v) {                               \
-    int i;                                                                     \
+    uint64_t i;                                                                \
     if (v->element_free) {                                                     \
       for (i = 0; i < v->index; i++) {                                         \
         v->element_free(&v->elements[i]);                                      \

@@ -1,5 +1,6 @@
 #include "slowjs/parse.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -28,13 +29,24 @@
   STORE_TOKENS_COPY(copy, tokens, err)                                         \
   vector_token_free(copy);
 
+#define SLICE(tokens, slice, t, err)                                           \
+  err = vector_token_pop(tokens, &t);                                          \
+  if (err != E_VECTOR_OK) {                                                    \
+    goto cleanup;                                                              \
+  }                                                                            \
+                                                                               \
+  err = vector_token_push(&slice, t);                                          \
+  if (err != E_VECTOR_OK) {                                                    \
+    goto cleanup;                                                              \
+  }
+
 bool parse_declaration(vector_token *, declaration *);
 bool parse_number(vector_token *, double *);
 bool parse_literal(vector_token *, const char *);
 bool parse_identifier(vector_token *, vector_char *);
 bool parse_parameters(vector_token *, vector_string *);
 bool parse_function_call(vector_token *, function_call *);
-bool parse_operator(vector_token *, operator*);
+bool parse_binary_operator(vector_token *, operator*);
 bool parse_expression(vector_token *, expression *);
 bool parse_expressions(vector_token *, vector_expression *);
 bool parse_statement(vector_token *, statement *);
@@ -47,21 +59,21 @@ bool parse_declaration(vector_token *, declaration *);
 
 bool parse_number(vector_token *tokens, double *n) {
   token t = {0};
-  token *tp = 0;
   char *notfound = 0;
-  int err = E_PARSE_OK;
+  vector_error err = E_VECTOR_OK;
 
-  err = vector_token_pop(tokens, tp);
-  if (tp == 0) {
+  err = vector_token_pop(tokens, &t);
+  if (err != E_VECTOR_OK) {
     goto cleanup; // EOF?
   }
 
-  t = *tp;
-
+  errno = 0;
   *n = strtod(t.string.elements, &notfound);
-  if (t.string.elements != notfound) {
-    return true;
+  if (*n == 0 && (errno != 0 || t.string.elements == notfound)) {
+    goto cleanup;
   }
+
+  return true;
 
 cleanup:
   PUSH(tokens, t, err);
@@ -94,7 +106,9 @@ bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
   int i = 0;
   char c = 0;
   token t = {0};
-  vector_error err = vector_token_pop(tokens, &t);
+  vector_error err = E_VECTOR_OK;
+
+  err = vector_token_pop(tokens, &t);
   if (err == E_VECTOR_POP) {
     goto cleanup;
   }
@@ -103,8 +117,8 @@ bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
     c = t.string.elements[i];
 
     // Can start with [$_a-Z]
-    if (c != '$' && c != '_' &&
-        !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+    if (c == '$' || c == '_' ||
+        ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
       continue;
     }
 
@@ -126,7 +140,8 @@ bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   vector_char parameter = {0};
   vector_token copy = {0};
   token t = {0};
-  int i = 0, err = 0;
+  int i = 0;
+  vector_error err = 0;
   char c = 0;
   bool matched = false;
 
@@ -168,13 +183,27 @@ cleanup:
 
 bool parse_function_call(vector_token *tokens, function_call *fc) {
   vector_expression expressions = {0};
-  vector_token copy = {0};
+  vector_token copy = {0}, slice = {0};
   expression function = {0};
-  int err = E_PARSE_OK;
+  token t = {0};
+  vector_error err = E_VECTOR_OK;
+  bool matched = false;
+
+  if (tokens->index < 2) {
+    return false;
+  }
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
-  if (!parse_expression(tokens, &function)) {
+  matched =
+      strncmp(tokens->elements[tokens->index - 2].string.elements, "(", 1) == 0;
+  if (!matched) {
+    goto cleanup;
+  }
+
+  SLICE(tokens, slice, t, err);
+
+  if (!parse_expression(&slice, &function)) {
     goto cleanup;
   }
 
@@ -194,42 +223,70 @@ cleanup:
   return false;
 }
 
-bool parse_operator(vector_token *tokens, operator*o) {
-  vector_token copy = {0};
+bool parse_binary_operator(vector_token *tokens, operator*o) {
+  const char *operators[] = {"+", "-", "/", "*"};
+  vector_token copy = {0}, slice = {0};
   expression left = {0}, right = {0};
   token t = {0};
-  int err = E_PARSE_OK;
+  int i = 0;
+  vector_error err = E_VECTOR_OK;
+  bool matched = false;
+
+  if (tokens->index < 2) {
+    return false;
+  }
+
+  t = tokens->elements[tokens->index - 2];
+  for (i = 0; i < (sizeof operators / sizeof operators[0]); i++) {
+    matched = strncmp(t.string.elements, operators[i], 1) == 0;
+    if (!matched) {
+      continue;
+    }
+
+    switch (operators[i][0]) {
+    case '+':
+      o->type = OPERATOR_PLUS;
+      break;
+    case '-':
+      o->type = OPERATOR_MINUS;
+      break;
+    case '*':
+      o->type = OPERATOR_TIMES;
+      break;
+    case '/':
+      o->type = OPERATOR_DIV;
+      break;
+    default:
+      PARSE_ERROR("Unhandled operator", t);
+      goto cleanup;
+    }
+
+    break;
+  }
+
+  if (!matched) {
+    return false;
+  }
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
-  if (!parse_expression(tokens, &left)) {
+  SLICE(tokens, slice, t, err);
+  if (!parse_expression(&slice, &left)) {
     goto cleanup;
   }
 
-  if (!(o->left_operand = malloc(sizeof(expression))) ||
-      !(o->right_operand = malloc(sizeof(expression)))) {
-    goto cleanup;
-  }
-  memcpy(o->left_operand, &left, sizeof(expression));
-  memcpy(o->right_operand, &right, sizeof(expression));
-
-  if (parse_literal(tokens, "+")) {
-    o->type = OPERATOR_PLUS;
-  } else if (parse_literal(tokens, "-")) {
-    o->type = OPERATOR_MINUS;
-  } else if (parse_literal(tokens, "*")) {
-    o->type = OPERATOR_TIMES;
-  } else if (parse_literal(tokens, "/")) {
-    o->type = OPERATOR_DIV;
-  } else {
-    vector_token_pop(tokens, &t);
-    PARSE_ERROR("Invalid operator", t);
+  // Drop the operator
+  err = vector_token_pop(tokens, &t);
+  if (err != E_VECTOR_OK) {
     goto cleanup;
   }
 
   if (!parse_expression(tokens, &right)) {
     goto cleanup;
   }
+
+  memcpy(o->left_operand, &left, sizeof(expression));
+  memcpy(o->right_operand, &right, sizeof(expression));
 
   vector_token_free(&copy);
   return true;
@@ -247,7 +304,6 @@ bool parse_expression(vector_token *tokens, expression *e) {
   double n = 0;
   vector_error err = E_VECTOR_OK;
 
-  printf("here? ofoofoo\n");
   if (parse_literal(tokens, "(")) {
     STORE_TOKENS_COPY(tokens, &copy, err);
 
@@ -261,25 +317,21 @@ bool parse_expression(vector_token *tokens, expression *e) {
     return false;
   }
 
-  printf("here? ofoofoo\n");
-  if (parse_identifier(tokens, &id)) {
-    printf("here? ofoofoo222\n");
-    e->type = EXPRESSION_IDENTIFIER;
-    e->expression.identifier = id;
-    return true;
-  }
-
-  printf("here? ofoofoo\n");
   if (parse_function_call(tokens, &fc)) {
     e->type = EXPRESSION_CALL;
     e->expression.function_call = fc;
     return true;
   }
 
-  printf("here? ofoofoo\n");
-  if (parse_operator(tokens, &o)) {
+  if (parse_binary_operator(tokens, &o)) {
     e->type = EXPRESSION_OPERATOR;
     e->expression.operator= o;
+    return true;
+  }
+
+  if (parse_identifier(tokens, &id)) {
+    e->type = EXPRESSION_IDENTIFIER;
+    e->expression.identifier = id;
     return true;
   }
 
@@ -295,7 +347,7 @@ bool parse_expression(vector_token *tokens, expression *e) {
 bool parse_expressions(vector_token *tokens, vector_expression *expressions) {
   vector_token copy = {0};
   expression e = {0};
-  int err = E_PARSE_OK;
+  vector_error err = E_VECTOR_OK;
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
@@ -358,11 +410,10 @@ bool parse_statement(vector_token *tokens, statement *statement) {
 bool parse_block(vector_token *tokens, vector_statement *statements) {
   vector_token copy = {0};
   statement s = {0};
-  int err = E_PARSE_OK;
+  vector_error err = E_VECTOR_OK;
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
-  printf("here now?\n");
   while (true) {
     if (parse_literal(tokens, "}")) {
       break;
@@ -372,7 +423,6 @@ bool parse_block(vector_token *tokens, vector_statement *statements) {
       goto cleanup;
     }
 
-    printf("here now now?\n");
     if (!parse_statement(tokens, &s)) {
       goto cleanup;
     }
@@ -394,7 +444,7 @@ bool parse_function_declaration(vector_token *tokens,
                                 function_declaration *fd) {
   vector_token copy = {0};
   token t = {0};
-  int err = E_PARSE_OK;
+  vector_error err = E_VECTOR_OK;
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 

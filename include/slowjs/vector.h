@@ -59,11 +59,9 @@ typedef enum {
                                                                                \
     if (c < v->index) {                                                        \
       memcpy(new_elements, v->elements, sizeof(t) * c);                        \
-    } else if (v->index) {                                                     \
+      v->index = c;                                                            \
+    } else if (v->index > 0) {                                                 \
       memcpy(new_elements, v->elements, sizeof(t) * (v->index));               \
-    }                                                                          \
-                                                                               \
-    if (v->size) {                                                             \
       free(v->elements);                                                       \
     }                                                                          \
                                                                                \

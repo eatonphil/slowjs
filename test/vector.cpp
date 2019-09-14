@@ -108,6 +108,21 @@ TEST(vector, push_resize_when_neccessary) {
   vector_uint64_t_free(&s);
 }
 
+TEST(vector, resize_down) {
+  const uint64_t test[] = {32, 44, 87};
+  vector_uint64_t s = {0};
+  vector_error err = E_VECTOR_OK;
+
+  err = vector_uint64_t_copy(&s, (uint64_t *)test,
+                             sizeof(test) / sizeof(test[0]));
+  ASSERT_EQ(E_VECTOR_OK, err);
+
+  err = vector_uint64_t_resize(&s, 1);
+  ASSERT_EQ(E_VECTOR_OK, err);
+  ASSERT_EQ(1, s.index);
+  ASSERT_LE(1, s.size);
+}
+
 TEST(vector, pop) {
   const uint64_t test[] = {99, 54, 12};
   vector_uint64_t s = {0};

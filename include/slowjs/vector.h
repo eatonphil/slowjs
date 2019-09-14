@@ -2,6 +2,7 @@
 #define _VECTOR_H_
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -55,7 +56,12 @@ typedef enum {
     if (new_elements == 0) {                                                   \
       return E_VECTOR_INIT_MALLOC;                                             \
     }                                                                          \
-    memcpy(new_elements, v->elements, sizeof(t) * v->size);                    \
+                                                                               \
+    if (c < v->index) {                                                        \
+      memcpy(new_elements, v->elements, sizeof(t) * c);                        \
+    } else if (v->index) {                                                     \
+      memcpy(new_elements, v->elements, sizeof(t) * (v->index));               \
+    }                                                                          \
                                                                                \
     if (v->size) {                                                             \
       free(v->elements);                                                       \

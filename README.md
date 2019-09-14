@@ -2,6 +2,12 @@
 
 A standalone (just libc) JavaScript interpreter.
 
+### Dependencies
+
+* git
+* gpp/clang
+* cmake
+* make
 
 ### Example
 

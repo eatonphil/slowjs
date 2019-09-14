@@ -285,7 +285,18 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
     goto cleanup;
   }
 
+  o->left_operand = (expression *)malloc(sizeof(expression));
+  if (o->left_operand == 0) {
+    PARSE_ERROR("Out of memory", t);
+    goto cleanup;
+  }
   memcpy(o->left_operand, &left, sizeof(expression));
+
+  o->right_operand = (expression *)malloc(sizeof(expression));
+  if (o->right_operand == 0) {
+    PARSE_ERROR("Out of memory", t);
+    goto cleanup;
+  }
   memcpy(o->right_operand, &right, sizeof(expression));
 
   vector_token_free(&copy);

@@ -19,7 +19,7 @@ void generate_backtrace(int sig) {
   size_t size = 0;
 
   // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
+  size = backtrace(array, 20);
 
   // print out all the frames to stderr
   fprintf(stderr, "Error: signal %d:\n", sig);
@@ -32,6 +32,12 @@ void register_backtraces() {
 
   action.sa_handler = generate_backtrace;
   if (sigaction(SIGSEGV, &action, NULL) < 0) {
+    printf("Unable to register segfault handler.\n");
+    exit(1);
+  }
+
+  action.sa_handler = generate_backtrace;
+  if (sigaction(SIGABRT, &action, NULL) < 0) {
     printf("Unable to register segfault handler.\n");
     exit(1);
   }

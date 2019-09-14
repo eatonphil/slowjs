@@ -19,7 +19,7 @@ typedef enum {
 #define DECLARE_VECTOR(t)                                                      \
   struct vector_##t {                                                          \
     uint64_t index;                                                            \
-    uint64_int size;                                                           \
+    uint64_t size;                                                             \
     t *elements;                                                               \
     void (*element_free)(t *);                                                 \
   };                                                                           \
@@ -30,6 +30,7 @@ typedef enum {
   static vector_error vector_##t##_push(vector_##t *, t);                      \
   static vector_error vector_##t##_pop(vector_##t *, t *);                     \
   static vector_error vector_##t##_get(vector_##t *, uint64_t, t *);           \
+  static vector_error vector_##t##_set(vector_##t *, uint64_t, t *);           \
   static vector_error vector_##t##_copy(vector_##t *, t *, uint64_t);          \
   static void vector_##t##_free(vector_##t *);                                 \
                                                                                \
@@ -108,6 +109,15 @@ typedef enum {
                                        t *out) {                               \
     if (index < v->index) {                                                    \
       *out = v->elements[index];                                               \
+      return E_VECTOR_OK;                                                      \
+    }                                                                          \
+                                                                               \
+    return E_VECTOR_OUT_OF_BOUNDS;                                             \
+  }                                                                            \
+                                                                               \
+  static vector_error vector_##t##_set(vector_##t *v, uint64_t index, t *in) { \
+    if (index < v->index) {                                                    \
+      memcpy(v->elements + index, in, sizeof(t));                              \
       return E_VECTOR_OK;                                                      \
     }                                                                          \
                                                                                \

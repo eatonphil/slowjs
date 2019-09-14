@@ -49,7 +49,7 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
   value function = {0}, v = {0};
   vector_char p = {0};
   context mapping = {0};
-  int i = 0;
+  uint64_t i = 0;
   interpret_error err = E_INTERPRET_OK;
 
   err = interpret_expression(*fc.function, ctx, &function);
@@ -118,7 +118,7 @@ interpret_error interpret_operator(operator o, vector_context *ctx,
 
 interpret_error interpret_expression(expression e, vector_context *ctx,
                                      value *result) {
-  int i = 0;
+  uint64_t i = 0;
   bool matched = false;
 
   switch (e.type) {
@@ -162,7 +162,7 @@ interpret_error interpret_statement(statement s, vector_context *ctx,
 
 interpret_error interpret_statements(vector_statement body, vector_context *ctx,
                                      value *result) {
-  int i = 0;
+  uint64_t i = 0;
   interpret_error err = E_INTERPRET_OK;
 
   for (i = 0; i < body.index; i++) {
@@ -229,7 +229,7 @@ interpret_error interpret(ast program) {
   vector_context ctx = {0};
   declaration d = {0};
   function_declaration main = {0};
-  int i = 0;
+  uint64_t i = 0;
   interpret_error err = E_INTERPRET_OK;
   bool found_main = false, matched = false;
 

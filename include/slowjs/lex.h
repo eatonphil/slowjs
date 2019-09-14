@@ -7,8 +7,8 @@ enum lex_error { E_LEX_OK, E_LEX_MALLOC };
 typedef enum lex_error lex_error;
 
 struct token {
-  int line;
-  int col;
+  uint64_t line;
+  uint64_t col;
   vector_char string;
 };
 typedef struct token token;

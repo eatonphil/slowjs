@@ -4,13 +4,14 @@
 
 #include "slowjs/common.h"
 
-#define LEX_ERROR(msg, t) fprintf(stderr, "%s near %d:%d\n", msg, t.line, t.col)
+#define LEX_ERROR(msg, t)                                                      \
+  fprintf(stderr, "%s near %llu:%llu\n", msg, t.line, t.col)
 
-vector_error vector_token_push_char(vector_token *, int, int, char);
+vector_error vector_token_push_char(vector_token *, uint64_t, uint64_t, char);
 lex_error reverse_tokens_and_null_terminate(vector_token *);
 
-vector_error vector_token_push_char(vector_token *v, int line, int col,
-                                    char c) {
+vector_error vector_token_push_char(vector_token *v, uint64_t line,
+                                    uint64_t col, char c) {
   token t = {0};
   vector_error err = E_VECTOR_OK;
 
@@ -27,7 +28,7 @@ vector_error vector_token_push_char(vector_token *v, int line, int col,
 
 lex_error reverse_tokens_and_null_terminate(vector_token *tokens_out) {
   vector_token copy = {0};
-  int i = 0;
+  uint64_t i = 0;
   lex_error err = E_LEX_OK;
 
   err = (lex_error)vector_token_copy(&copy, tokens_out->elements,
@@ -58,7 +59,7 @@ lex_error lex(vector_char source, vector_token *tokens_out) {
   token current = {0};
   lex_error err = E_LEX_OK;
   char c = 0;
-  int i = 0;
+  uint64_t i = 0;
   bool in_comment = false;
 
   for (i = 0; i < source.index; i++) {

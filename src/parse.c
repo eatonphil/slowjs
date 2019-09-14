@@ -8,7 +8,7 @@
 #include "slowjs/lex.h"
 
 #define PARSE_ERROR(msg, t)                                                    \
-  fprintf(stderr, "%s near \"%s\" at %d:%d.\n", msg, t.string.elements,        \
+  fprintf(stderr, "%s near \"%s\" at %llu:%llu.\n", msg, t.string.elements,    \
           t.line, t.col - t.string.index)
 
 #define PUSH(tokens, t, err)                                                   \
@@ -103,7 +103,7 @@ cleanup:
 }
 
 bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
-  int i = 0;
+  uint64_t i = 0;
   char c = 0;
   token t = {0};
   vector_error err = E_VECTOR_OK;
@@ -140,7 +140,7 @@ bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   vector_char parameter = {0};
   vector_token copy = {0};
   token t = {0};
-  int i = 0;
+  uint64_t i = 0;
   vector_error err = 0;
   char c = 0;
   bool matched = false;
@@ -228,7 +228,7 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
   vector_token copy = {0}, slice = {0};
   expression left = {0}, right = {0};
   token t = {0};
-  int i = 0;
+  uint64_t i = 0;
   vector_error err = E_VECTOR_OK;
   bool matched = false;
 

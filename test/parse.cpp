@@ -8,8 +8,8 @@ extern "C" {
 }
 
 TEST(parse, identifier_bad) {
-  vector_token tokens = {0};
-  vector_char source = {0}, test_identifier = {0};
+  vector_token tokens = {};
+  vector_char source = {}, test_identifier = {};
   const char raw_source[] = "1";
   vector_error verr = E_VECTOR_OK;
   lex_error lerr = E_LEX_OK;
@@ -25,8 +25,8 @@ TEST(parse, identifier_bad) {
 }
 
 TEST(parse, identifier_good) {
-  vector_token tokens = {0};
-  vector_char source = {0}, test_identifier = {0};
+  vector_token tokens = {};
+  vector_char source = {}, test_identifier = {};
   const char *raw_source[] = {
       "a", "ab", "abcd124", "_", "$", "$12",
   };
@@ -53,8 +53,8 @@ TEST(parse, identifier_good) {
 }
 
 TEST(parse, number_good) {
-  vector_token tokens = {0};
-  vector_char source = {0};
+  vector_token tokens = {};
+  vector_char source = {};
   const char raw_source[] = "1";
   vector_error verr = E_VECTOR_OK;
   lex_error lerr = E_LEX_OK;
@@ -73,8 +73,8 @@ TEST(parse, number_good) {
 }
 
 TEST(parse, number_bad) {
-  vector_token tokens = {0};
-  vector_char source = {0};
+  vector_token tokens = {};
+  vector_char source = {};
   const char raw_source[] = "b";
   vector_error verr = E_VECTOR_OK;
   lex_error lerr = E_LEX_OK;
@@ -93,8 +93,8 @@ TEST(parse, number_bad) {
 }
 
 TEST(parse, function_good) {
-  vector_token tokens = {0};
-  vector_char source = {0};
+  vector_token tokens = {};
+  vector_char source = {};
   struct test {
     const char *src;
     uint expected_tokens;
@@ -105,7 +105,7 @@ TEST(parse, function_good) {
       {"function t() { return 1; }", 9},
   };
   vector_error verr = E_VECTOR_OK;
-  function_declaration test_fd = {0};
+  function_declaration test_fd = {};
   lex_error lerr = E_LEX_OK;
   uint64_t i = 0;
 
@@ -125,10 +125,42 @@ TEST(parse, function_good) {
     ASSERT_TRUE(parse_function_declaration(&tokens, &test_fd));
 
     function_declaration_free(&test_fd);
-    test_fd = (function_declaration){0};
     vector_token_free(&tokens);
-    tokens = (vector_token){0};
     vector_char_free(&source);
-    source = (vector_char){0};
+  }
+}
+
+TEST(parse, statement_good) {
+  vector_token tokens = {};
+  vector_char source = {};
+  struct test {
+    const char *src;
+    uint expected_tokens;
+  } tests[] = {
+      {"return 1", 2},
+  };
+  vector_error verr = E_VECTOR_OK;
+  statement test_statement = {};
+  lex_error lerr = E_LEX_OK;
+  uint64_t i = 0;
+
+  ASSERT_EQ(1, sizeof(tests) / sizeof(tests[0]));
+
+  for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+    printf("Testing: `%s`\n", tests[i].src);
+
+    verr =
+        vector_char_copy(&source, (char *)tests[i].src, strlen(tests[i].src));
+    ASSERT_EQ(E_VECTOR_OK, verr);
+
+    lerr = lex(source, &tokens);
+    ASSERT_EQ(E_LEX_OK, lerr);
+    ASSERT_EQ(tests[i].expected_tokens, tokens.index);
+
+    ASSERT_TRUE(parse_statement(&tokens, &test_statement));
+
+    statement_free(&test_statement);
+    vector_token_free(&tokens);
+    vector_char_free(&source);
   }
 }

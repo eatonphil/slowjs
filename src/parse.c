@@ -131,15 +131,7 @@ bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   STORE_TOKENS_COPY(tokens, &copy, err);
 
   while (true) {
-    // Last element
-    t = tokens->elements[tokens->index - 1];
-    found_closing_paren = strncmp(t.string.elements, ")", 1) == 0;
-    if (found_closing_paren) {
-      err = vector_token_pop(tokens, &t);
-      if (err != E_VECTOR_OK) {
-        goto cleanup;
-      }
-
+    if (parse_literal(tokens, ")")) {
       break;
     }
 
@@ -393,6 +385,7 @@ bool parse_statement(vector_token *tokens, statement *statement) {
     return true;
   }
 
+  // TODO: support `return;`
   if (parse_literal(tokens, "return") && parse_expression(tokens, &e)) {
     statement->type = STATEMENT_RETURN;
     statement->statement.ret = e;
@@ -437,6 +430,7 @@ bool parse_block(vector_token *tokens, vector_statement *statements) {
   return true;
 
 cleanup:
+  statement_free(&s);
   RESTORE_TOKENS_COPY(tokens, &copy, err);
   return false;
 }

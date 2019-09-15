@@ -14,7 +14,7 @@ void function_call_free(function_call *fc) {
   }
 }
 
-void operator_free(operator*o) {
+void op_free(op *o) {
   expression_free(o->left_operand);
   free(o->left_operand);
   expression_free(o->right_operand);
@@ -26,8 +26,8 @@ void expression_free(expression *e) {
   case EXPRESSION_CALL:
     function_call_free(&e->expression.function_call);
     break;
-  case EXPRESSION_OPERATOR:
-    operator_free(&e->expression.operator);
+  case EXPRESSION_OP:
+    op_free(&e->expression.op);
     break;
   case EXPRESSION_IDENTIFIER:
     vector_char_free(&e->expression.identifier);

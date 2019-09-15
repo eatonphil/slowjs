@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "slowjs/common.h"
-#include "slowjs/lex.h"
-
 #define PARSE_ERROR(msg, t)                                                    \
   fprintf(stderr, "%s near \"%s\" at %llu:%llu.\n", msg, t.string.elements,    \
           t.line, t.col - t.string.index)
@@ -39,23 +36,6 @@
   if (err != E_VECTOR_OK) {                                                    \
     goto cleanup;                                                              \
   }
-
-bool parse_declaration(vector_token *, declaration *);
-bool parse_number(vector_token *, double *);
-bool parse_literal(vector_token *, const char *);
-bool parse_identifier(vector_token *, vector_char *);
-bool parse_parameters(vector_token *, vector_string *);
-bool parse_function_call(vector_token *, function_call *);
-bool parse_binary_operator(vector_token *, operator*);
-bool parse_expression(vector_token *, expression *);
-bool parse_expressions(vector_token *, vector_expression *);
-bool parse_statement(vector_token *, statement *);
-bool parse_block(vector_token *, vector_statement *);
-bool parse_function_declaration(vector_token *, function_declaration *);
-bool parse_const_declaration(vector_token *, vector_variable_declaration *);
-bool parse_let_declaration(vector_token *, vector_variable_declaration *);
-bool parse_var_declaration(vector_token *, vector_variable_declaration *);
-bool parse_declaration(vector_token *, declaration *);
 
 bool parse_number(vector_token *tokens, double *n) {
   token t = {0};
@@ -90,7 +70,8 @@ bool parse_literal(vector_token *tokens, const char *match) {
     goto cleanup;
   }
 
-  matched = strncmp(t.string.elements, match, t.string.index) == 0;
+  // TODO: is this going to crash if match is longer?
+  matched = strncmp(t.string.elements, match, strlen(match)) == 0;
   if (!matched) {
     goto cleanup;
   }
@@ -107,13 +88,15 @@ bool parse_identifier(vector_token *tokens, vector_char *identifer_out) {
   char c = 0;
   token t = {0};
   vector_error err = E_VECTOR_OK;
+  uint64_t token_length = 0;
 
   err = vector_token_pop(tokens, &t);
   if (err == E_VECTOR_POP) {
     goto cleanup;
   }
 
-  for (i = 0; i < t.string.index; i++) {
+  token_length = t.string.index - 1; // Omit trailing \0
+  for (i = 0; i < token_length; i++) {
     c = t.string.elements[i];
 
     // Can start with [$_a-Z]
@@ -143,27 +126,31 @@ bool parse_parameters(vector_token *tokens, vector_string *parameters) {
   uint64_t i = 0;
   vector_error err = 0;
   char c = 0;
-  bool matched = false;
+  bool found_closing_paren = false;
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
   while (true) {
-    err = vector_token_pop(tokens, &t);
-    if (err != E_VECTOR_OK) {
-      goto cleanup;
-    }
+    // Last element
+    t = tokens->elements[tokens->index - 1];
+    found_closing_paren = strncmp(t.string.elements, ")", 1) == 0;
+    if (found_closing_paren) {
+      err = vector_token_pop(tokens, &t);
+      if (err != E_VECTOR_OK) {
+        goto cleanup;
+      }
 
-    matched = strncmp(t.string.elements, ")", 1) == 0;
-    if (matched) {
       break;
     }
 
     if (parameters->index > 0 && !parse_literal(tokens, ",")) {
+      vector_token_get(tokens, tokens->index - 1, &t);
       PARSE_ERROR("Expected comma after parameter", t);
       goto cleanup;
     }
 
     if (!parse_identifier(tokens, &parameter)) {
+      vector_token_get(tokens, tokens->index - 1, &t);
       PARSE_ERROR("Invalid identifier", t);
       goto cleanup;
     }
@@ -223,8 +210,8 @@ cleanup:
   return false;
 }
 
-bool parse_binary_operator(vector_token *tokens, operator*o) {
-  const char *operators[] = {"+", "-", "/", "*"};
+bool parse_binary_op(vector_token *tokens, op *o) {
+  const char *ops[] = {"+", "-", "/", "*"};
   vector_token copy = {0}, slice = {0};
   expression left = {0}, right = {0};
   token t = {0};
@@ -237,27 +224,28 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
   }
 
   t = tokens->elements[tokens->index - 2];
-  for (i = 0; i < (sizeof operators / sizeof operators[0]); i++) {
-    matched = strncmp(t.string.elements, operators[i], 1) == 0;
+  for (i = 0; i < (sizeof ops / sizeof ops[0]); i++) {
+    matched = strncmp(t.string.elements, ops[i], 1) == 0;
     if (!matched) {
       continue;
     }
 
-    switch (operators[i][0]) {
+    switch (ops[i][0]) {
     case '+':
-      o->type = OPERATOR_PLUS;
+      o->type = OP_PLUS;
       break;
     case '-':
-      o->type = OPERATOR_MINUS;
+      o->type = OP_MINUS;
       break;
     case '*':
-      o->type = OPERATOR_TIMES;
+      o->type = OP_TIMES;
       break;
     case '/':
-      o->type = OPERATOR_DIV;
+      o->type = OP_DIV;
       break;
     default:
-      PARSE_ERROR("Unhandled operator", t);
+      vector_token_get(tokens, tokens->index - 1, &t);
+      PARSE_ERROR("Unhandled op", t);
       goto cleanup;
     }
 
@@ -275,7 +263,7 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
     goto cleanup;
   }
 
-  // Drop the operator
+  // Drop the op
   err = vector_token_pop(tokens, &t);
   if (err != E_VECTOR_OK) {
     goto cleanup;
@@ -287,6 +275,7 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
 
   o->left_operand = (expression *)malloc(sizeof(expression));
   if (o->left_operand == 0) {
+    vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Out of memory", t);
     goto cleanup;
   }
@@ -294,6 +283,7 @@ bool parse_binary_operator(vector_token *tokens, operator*o) {
 
   o->right_operand = (expression *)malloc(sizeof(expression));
   if (o->right_operand == 0) {
+    vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Out of memory", t);
     goto cleanup;
   }
@@ -311,7 +301,7 @@ bool parse_expression(vector_token *tokens, expression *e) {
   vector_token copy = {0};
   vector_char id = {0};
   function_call fc = {0};
-  operator o = {0};
+  op o = {0};
   double n = 0;
   vector_error err = E_VECTOR_OK;
 
@@ -334,9 +324,9 @@ bool parse_expression(vector_token *tokens, expression *e) {
     return true;
   }
 
-  if (parse_binary_operator(tokens, &o)) {
-    e->type = EXPRESSION_OPERATOR;
-    e->expression.operator= o;
+  if (parse_binary_op(tokens, &o)) {
+    e->type = EXPRESSION_OP;
+    e->expression.op = o;
     return true;
   }
 
@@ -475,21 +465,26 @@ bool parse_function_declaration(vector_token *tokens,
   }
 
   if (!parse_literal(tokens, "(")) {
+    vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Expected parenthesis after function name", t);
     goto cleanup;
   }
 
   if (!parse_parameters(tokens, &fd->parameters)) {
+    vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Expected parameters", t);
     goto cleanup;
   }
 
   if (!parse_literal(tokens, "{")) {
+    vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Expected opening brace", t);
     goto cleanup;
   }
 
   if (!parse_block(tokens, &fd->body)) {
+    vector_token_get(tokens, tokens->index - 1, &t);
+    PARSE_ERROR("Expected body", t);
     goto cleanup;
   }
 
@@ -556,6 +551,8 @@ bool parse_declaration(vector_token *tokens, declaration *d) {
     return true;
   }
 
+  vector_variable_declaration_free(&vd);
+  function_declaration_free(&fd);
   return false;
 }
 

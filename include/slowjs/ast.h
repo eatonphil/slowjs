@@ -17,26 +17,21 @@ typedef struct function_call function_call;
 
 void function_call_free(function_call *);
 
-enum operator_type {
-  OPERATOR_PLUS,
-  OPERATOR_MINUS,
-  OPERATOR_TIMES,
-  OPERATOR_DIV
-};
-typedef enum operator_type operator_type;
+enum op_type { OP_PLUS, OP_MINUS, OP_TIMES, OP_DIV };
+typedef enum op_type op_type;
 
-struct operator{
-  operator_type type;
+struct op {
+  op_type type;
   struct expression *left_operand;
   struct expression *right_operand;
 };
-typedef struct operator operator;
+typedef struct op op;
 
-void operator_free(operator*);
+void op_free(op *);
 
 enum expression_type {
   EXPRESSION_CALL,
-  EXPRESSION_OPERATOR,
+  EXPRESSION_OP,
   EXPRESSION_IDENTIFIER,
   EXPRESSION_NUMBER
 };
@@ -46,7 +41,7 @@ struct expression {
   expression_type type;
   union {
     function_call function_call;
-    operator operator;
+    op op;
     double number;
     vector_char identifier;
   } expression;
@@ -77,8 +72,8 @@ typedef enum statement_type statement_type;
 struct statement {
   statement_type type;
   union {
-    expression expression;
-    expression ret;
+    struct expression expression;
+    struct expression ret;
     struct declaration *declaration;
   } statement;
 };

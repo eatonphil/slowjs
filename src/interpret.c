@@ -83,8 +83,7 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
   return interpret_statements(function.value.closure.body, &child_ctx, result);
 }
 
-interpret_error interpret_operator(operator o, vector_context *ctx,
-                                   value *result) {
+interpret_error interpret_op(op o, vector_context *ctx, value *result) {
   value left = {0}, right = {0};
   interpret_error err = E_INTERPRET_OK;
 
@@ -100,16 +99,16 @@ interpret_error interpret_operator(operator o, vector_context *ctx,
 
   result->type = VALUE_NUMBER;
   switch (o.type) {
-  case OPERATOR_PLUS:
+  case OP_PLUS:
     result->value.number = left.value.number + right.value.number;
     break;
-  case OPERATOR_MINUS:
+  case OP_MINUS:
     result->value.number = left.value.number - right.value.number;
     break;
-  case OPERATOR_TIMES:
+  case OP_TIMES:
     result->value.number = left.value.number * right.value.number;
     break;
-  case OPERATOR_DIV:
+  case OP_DIV:
     result->value.number = left.value.number / right.value.number;
   }
 
@@ -141,8 +140,8 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
     return E_INTERPRET_OK;
   case EXPRESSION_CALL:
     return interpret_function_call(e.expression.function_call, ctx, result);
-  case EXPRESSION_OPERATOR:
-    return interpret_operator(e.expression.operator, ctx, result);
+  case EXPRESSION_OP:
+    return interpret_op(e.expression.op, ctx, result);
   }
 }
 

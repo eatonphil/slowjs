@@ -52,6 +52,7 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
   uint64_t i = 0;
   interpret_error err = E_INTERPRET_OK;
 
+  printf("here: %llu\n", *fc.function);
   err = interpret_expression(*fc.function, ctx, &function);
   if (err != E_INTERPRET_OK) {
     return err;
@@ -123,6 +124,7 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
   switch (e.type) {
   case EXPRESSION_IDENTIFIER:
     for (i = 0; i < ctx->index; i++) {
+      printf("looking up: %s\n", e.expression.identifier.elements);
       matched = strncmp(ctx->elements[i].name.elements,
                         e.expression.identifier.elements,
                         ctx->elements[i].name.index) == 0;
@@ -189,6 +191,8 @@ interpret_error interpret_function_declaration(function_declaration fd,
 
   mapping.name = fd.name;
   mapping.value = v;
+
+  printf("storing function: %s\n", fd.name.elements);
 
   return (interpret_error)vector_context_push(ctx, mapping);
 }

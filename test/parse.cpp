@@ -200,3 +200,38 @@ TEST(parse, block_good) {
     vector_char_free(&source);
   }
 }
+
+TEST(parse, function_call_good) {
+  vector_token tokens = {};
+  vector_char source = {};
+  struct test {
+    const char *src;
+    uint expected_tokens;
+  } tests[] = {
+      {"foo(a, 1)", 6},
+  };
+  vector_error verr = E_VECTOR_OK;
+  function_call test_function_call = {};
+  lex_error lerr = E_LEX_OK;
+  uint64_t i = 0;
+
+  ASSERT_EQ(1, sizeof(tests) / sizeof(tests[0]));
+
+  for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+    printf("Testing: `%s`\n", tests[i].src);
+
+    verr =
+        vector_char_copy(&source, (char *)tests[i].src, strlen(tests[i].src));
+    ASSERT_EQ(E_VECTOR_OK, verr);
+
+    lerr = lex(source, &tokens);
+    ASSERT_EQ(E_LEX_OK, lerr);
+    ASSERT_EQ(tests[i].expected_tokens, tokens.index);
+
+    ASSERT_TRUE(parse_function_call(&tokens, &test_function_call));
+
+    function_call_free(&test_function_call);
+    vector_token_free(&tokens);
+    vector_char_free(&source);
+  }
+}

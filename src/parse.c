@@ -174,6 +174,7 @@ bool parse_function_call(vector_token *tokens, function_call *fc) {
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
+  // This doesn't support calls like `(foo)()`, only `foo()`
   matched =
       strncmp(tokens->elements[tokens->index - 2].string.elements, "(", 1) == 0;
   if (!matched) {

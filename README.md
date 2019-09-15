@@ -17,7 +17,7 @@ function main() {
   return 1 + 3;
 }
 $ ./bin/slowjs examples/plus.js
-3
+4.000000
 ```
 
 ### Build

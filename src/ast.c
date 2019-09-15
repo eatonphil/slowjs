@@ -32,6 +32,8 @@ void expression_free(expression *e) {
   case EXPRESSION_IDENTIFIER:
     vector_char_free(&e->expression.identifier);
     break;
+  case EXPRESSION_BOOL:
+  case EXPRESSION_NULL:
   case EXPRESSION_NUMBER:
     break;
   }

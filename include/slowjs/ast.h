@@ -33,7 +33,9 @@ enum expression_type {
   EXPRESSION_CALL,
   EXPRESSION_OP,
   EXPRESSION_IDENTIFIER,
-  EXPRESSION_NUMBER
+  EXPRESSION_NUMBER,
+  EXPRESSION_NULL,
+  EXPRESSION_BOOL,
 };
 typedef enum expression_type expression_type;
 

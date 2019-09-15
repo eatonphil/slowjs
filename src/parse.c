@@ -168,22 +168,14 @@ bool parse_function_call(vector_token *tokens, function_call *fc) {
   vector_error err = E_VECTOR_OK;
   bool matched = false;
 
-  if (tokens->index < 2) {
+  // Must be of form <expression>(...)
+  if (tokens->index < 3) {
     return false;
   }
 
   STORE_TOKENS_COPY(tokens, &copy, err);
 
-  // This doesn't support calls like `(foo)()`, only `foo()`
-  matched =
-      strncmp(tokens->elements[tokens->index - 2].string.elements, "(", 1) == 0;
-  if (!matched) {
-    goto cleanup;
-  }
-
-  SLICE(tokens, slice, t, err);
-
-  if (!parse_expression(&slice, &function)) {
+  if (!parse_expression(tokens, &function)) {
     goto cleanup;
   }
 
@@ -311,12 +303,6 @@ bool parse_expression(vector_token *tokens, expression *e) {
     return false;
   }
 
-  if (parse_function_call(tokens, &fc)) {
-    e->type = EXPRESSION_CALL;
-    e->expression.function_call = fc;
-    return true;
-  }
-
   if (parse_binary_op(tokens, &o)) {
     e->type = EXPRESSION_OP;
     e->expression.op = o;
@@ -329,9 +315,30 @@ bool parse_expression(vector_token *tokens, expression *e) {
     return true;
   }
 
+  if (parse_literal(tokens, "null")) {
+    e->type = EXPRESSION_NULL;
+    e->expression.number = 0;
+  }
+
+  if (parse_literal(tokens, "true")) {
+    e->type = EXPRESSION_BOOL;
+    e->expression.number = 0;
+  }
+
+  if (parse_literal(tokens, "false")) {
+    e->type = EXPRESSION_BOOL;
+    e->expression.number = 1;
+  }
+
   if (parse_number(tokens, &n)) {
     e->type = EXPRESSION_NUMBER;
     e->expression.number = n;
+    return true;
+  }
+
+  if (parse_function_call(tokens, &fc)) {
+    e->type = EXPRESSION_CALL;
+    e->expression.function_call = fc;
     return true;
   }
 
@@ -374,6 +381,8 @@ cleanup:
 bool parse_statement(vector_token *tokens, statement *statement) {
   declaration d = {0};
   expression e = {0};
+  token t = {0};
+  bool matched = false;
 
   if (parse_declaration(tokens, &d)) {
     statement->type = STATEMENT_DECLARATION;
@@ -386,11 +395,21 @@ bool parse_statement(vector_token *tokens, statement *statement) {
     return true;
   }
 
-  // TODO: support `return;`
-  if (parse_literal(tokens, "return") && parse_expression(tokens, &e)) {
-    statement->type = STATEMENT_RETURN;
-    statement->statement.ret = e;
-    return true;
+  if (parse_literal(tokens, "return")) {
+    vector_token_get(tokens, tokens->index - 1, &t);
+    matched = strncmp(t.string.elements, ";", 1) == 0;
+
+    if (matched) {
+      e.type = EXPRESSION_NULL;
+    } else {
+      matched = parse_expression(tokens, &e);
+    }
+
+    if (matched) {
+      statement->type = STATEMENT_RETURN;
+      statement->statement.ret = e;
+      return true;
+    }
   }
 
   if (parse_expression(tokens, &e)) {

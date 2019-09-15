@@ -16,7 +16,7 @@ struct closure {
 };
 typedef struct closure closure;
 
-enum value_type { VALUE_NUMBER, VALUE_CLOSURE };
+enum value_type { VALUE_NUMBER, VALUE_CLOSURE, VALUE_NULL, VALUE_BOOL };
 typedef enum value_type value_type;
 
 struct value {
@@ -52,7 +52,6 @@ interpret_error interpret_function_call(function_call fc, vector_context *ctx,
   uint64_t i = 0;
   interpret_error err = E_INTERPRET_OK;
 
-  printf("here: %llu\n", *fc.function);
   err = interpret_expression(*fc.function, ctx, &function);
   if (err != E_INTERPRET_OK) {
     return err;
@@ -144,6 +143,14 @@ interpret_error interpret_expression(expression e, vector_context *ctx,
     return interpret_function_call(e.expression.function_call, ctx, result);
   case EXPRESSION_OP:
     return interpret_op(e.expression.op, ctx, result);
+  case EXPRESSION_BOOL:
+    result->type = VALUE_BOOL;
+    result->value.number = e.expression.number;
+    return E_INTERPRET_OK;
+  case EXPRESSION_NULL:
+    result->type = VALUE_NULL;
+    result->value.number = 0;
+    return E_INTERPRET_OK;
   }
 }
 

@@ -404,24 +404,35 @@ bool parse_statement(vector_token *tokens, statement *statement) {
 bool parse_block(vector_token *tokens, vector_statement *statements) {
   vector_token copy = {0};
   statement s = {0};
+  token t = {0};
   vector_error err = E_VECTOR_OK;
 
   STORE_TOKENS_COPY(tokens, &copy, err);
+
+  if (!parse_literal(tokens, "{")) {
+    vector_token_get(tokens, tokens->index - 1, &t);
+    PARSE_ERROR("Expected opening brace", t);
+    goto cleanup;
+  }
 
   while (true) {
     if (parse_literal(tokens, "}")) {
       break;
     }
 
-    if (statements->index > 0 && !parse_literal(tokens, ";")) {
-      goto cleanup;
-    }
-
     if (!parse_statement(tokens, &s)) {
+      vector_token_get(tokens, tokens->index - 1, &t);
+      PARSE_ERROR("Expected statement", t);
       goto cleanup;
     }
 
     if (vector_statement_push(statements, s) != E_VECTOR_OK) {
+      goto cleanup;
+    }
+
+    if (statements->index > 0 && !parse_literal(tokens, ";")) {
+      vector_token_get(tokens, tokens->index - 1, &t);
+      PARSE_ERROR("Expected semi-colon", t);
       goto cleanup;
     }
   }
@@ -467,12 +478,6 @@ bool parse_function_declaration(vector_token *tokens,
   if (!parse_parameters(tokens, &fd->parameters)) {
     vector_token_get(tokens, tokens->index - 1, &t);
     PARSE_ERROR("Expected parameters", t);
-    goto cleanup;
-  }
-
-  if (!parse_literal(tokens, "{")) {
-    vector_token_get(tokens, tokens->index - 1, &t);
-    PARSE_ERROR("Expected opening brace", t);
     goto cleanup;
   }
 

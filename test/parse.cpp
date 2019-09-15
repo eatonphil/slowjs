@@ -164,3 +164,39 @@ TEST(parse, statement_good) {
     vector_char_free(&source);
   }
 }
+
+TEST(parse, block_good) {
+  vector_token tokens = {};
+  vector_char source = {};
+  struct test {
+    const char *src;
+    uint expected_tokens;
+  } tests[] = {
+      {"{}", 2},
+      {"{ return 1; }", 5},
+  };
+  vector_error verr = E_VECTOR_OK;
+  vector_statement test_statements = {};
+  lex_error lerr = E_LEX_OK;
+  uint64_t i = 0;
+
+  ASSERT_EQ(2, sizeof(tests) / sizeof(tests[0]));
+
+  for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+    printf("Testing: `%s`\n", tests[i].src);
+
+    verr =
+        vector_char_copy(&source, (char *)tests[i].src, strlen(tests[i].src));
+    ASSERT_EQ(E_VECTOR_OK, verr);
+
+    lerr = lex(source, &tokens);
+    ASSERT_EQ(E_LEX_OK, lerr);
+    ASSERT_EQ(tests[i].expected_tokens, tokens.index);
+
+    ASSERT_TRUE(parse_block(&tokens, &test_statements));
+
+    vector_statement_free(&test_statements);
+    vector_token_free(&tokens);
+    vector_char_free(&source);
+  }
+}

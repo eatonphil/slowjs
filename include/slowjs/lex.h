@@ -1,22 +1,29 @@
-#ifndef _LEX_H_
-#define _LEX_H_
+#ifndef SLOWJS_LEX_H
+#define SLOWJS_LEX_H
 
-#include "slowjs/vector.h"
+#include <string>
+#include <vector>
 
-enum lex_error { E_LEX_OK, E_LEX_MALLOC };
-typedef enum lex_error lex_error;
-
-struct token {
-  uint64_t line;
-  uint64_t col;
-  vector_char string;
+struct Error {
+  std::string error;
 };
-typedef struct token token;
 
-DECLARE_VECTOR(token)
+static Error NoError = {};
 
-static void token_element_free(token *t) { vector_char_free(&t->string); }
+enum TokenType {IdentiferToken, KeywordToken, SymbolToken};
 
-lex_error lex(vector_char, vector_token *);
+struct Location {
+  unsigned int line;
+  unsigned int col;
+  unsigned int index;
+};
+
+struct Token {
+  std::string value;
+  enum TokenType type;
+  Location loc;
+};
+
+Error lex(const string& source, std::vector<Token>& tokens);
 
 #endif

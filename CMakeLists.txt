@@ -20,14 +20,13 @@ enable_testing()
 add_subdirectory(test)
 
 ##
-### Project definitions ###
+### Source definitions ###
 ##
 
-include_directories(
-  ${PROJECT_SOURCE_DIR}/include)
+include_directories("${PROJECT_SOURCE_DIR}/include")
 
 file(GLOB sources
   "${PROJECT_SOURCE_DIR}/include/slowjs/*.h"
-  "${PROJECT_SOURCE_DIR}/src/*.c")
+  "${PROJECT_SOURCE_DIR}/src/*.cc")
 
 add_executable(slowjs ${sources})

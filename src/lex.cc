@@ -1,24 +1,15 @@
 #include <slowjs/lex.h>
 
-#include <array>
 #include <algorithm>
 
-bool operator==(const Error& lhs, const Error& rhs) {
-  return lhs.error.compare(rhs.error) == 0;
-}
-
-bool operator!=(const Error& lhs, const Error& rhs) {
-  return !(lhs == rhs);
-}
-
-std::string longestMatch(const string& source, const unsigned int index, const std::array& options) {
+std::string longestMatch(const std::string& source, const uint64_t index, const std::vector<std::string>& options) {
   std::vector<bool> skipList(options.size());
 
-  unsigned int matchIndex = 0;
+  uint64_t matchIndex = 0;
   std::string match;
   while (matchIndex < source.length() &&
 	 std::count(skipList.begin(), skipList.end(), false) > 0) {
-    for (unsigned int i = 0; i < options.length(); i++) {
+    for (uint64_t i = 0; i < options.size(); i++) {
       if (skipList[i]) {
 	continue;
       }
@@ -44,23 +35,23 @@ std::string longestMatch(const string& source, const unsigned int index, const s
 
 typedef std::tuple<Error, Location, Token> lexResult;
 
-lexResult lexKeyword(const string& source, const Location loc) {
+lexResult lexKeyword(const std::string& source, const Location loc) {
   if (loc.index >= source.length()) {
-    return {NoError, loc.index, Token{}};
+    return {NoError, loc, Token{}};
   }
 
-  const std::array<string> keywords = {"function", "return"};
-  const string match = longestMatch(source, loc.index, keywords);
+  const std::vector<std::string> keywords = {"function", "return"};
+  const std::string match = longestMatch(source, loc.index, keywords);
   return {
 	  NoError,
 	  Location{loc.line, loc.col+match.size(), loc.index+match.size()},
-	  Token{match, KeywordType, loc},
+	  Token{match, KeywordToken, loc},
   };
 }
 
-lexResult lexSymbol(const string& source, const Location loc) {
+lexResult lexSymbol(const std::string& source, const Location loc) {
   if (loc.index >= source.length()) {
-    return {NoError, loc.index, Token{}};
+    return {NoError, loc, Token{}};
   }
 
   switch (source[loc.index]) {
@@ -78,21 +69,21 @@ lexResult lexSymbol(const string& source, const Location loc) {
     };
   }
 
-  const std::array<string> keywords = {"{", "}", "(", ")", ";", "+"};
-  const string match = longestMatch(source, loc.index, keywords);
+  const std::vector<std::string> keywords = {"{", "}", "(", ")", ";", "+"};
+  const std::string match = longestMatch(source, loc.index, keywords);
   return {
 	  NoError,
 	  Location{loc.line, loc.col+match.size(), loc.index+match.size()},
-	  Token{match, SymbolType, loc},
+	  Token{match, SymbolToken, loc},
   };
 }
 
-lexResult lexIdentifier(const string& source, const Location loc) {
+lexResult lexIdentifier(const std::string& source, const Location loc) {
   if (loc.index >= source.length()) {
     return {NoError, loc, Token{}};
   }
 
-  unsigned int i = loc.index;
+  uint64_t i = loc.index;
   for (; i < source.size(); i++) {
     bool isAlpha = (source[i] >= 'a' && source[i] <= 'z') ||
       (source[i] >= 'A' && source[i] <= 'Z');
@@ -118,26 +109,26 @@ lexResult lexIdentifier(const string& source, const Location loc) {
 	  {loc.line, loc.col + i - loc.index, loc.index},
 	  Token{
 		source.substr(loc.index, i),
-		IdentiferType,
+		IdentifierToken,
 		loc,
 	  },
   };
 }
 
-Error lex(const string& source, std::vector<Token>& tokens) {
+Error lex(const std::string& source, std::vector<Token>& tokens) {
   Location loc = {};
-  
-  std::array<lexResult (*)(const string&, const unsigned int)> lexers = {lexKeyword, lexSymbol, lexIdentifier};
 
-  while (index < source.length()) {
-    for (unsigned int i = 0; i < (sizeof lexResult / sizeof lexResult[0]); i++) {
-      auto [error, newIndex, token] = lexers[i](source, index);
+  std::vector<lexResult (*)(const std::string&, const Location)> lexers = {lexKeyword, lexSymbol, lexIdentifier};
+
+  while (loc.index < source.length()) {
+    for (uint64_t i = 0; i < (sizeof lexers / sizeof lexers[0]); i++) {
+      auto [error, newLoc, token] = lexers[i](source, loc);
       if (error != NoError) {
 	return error;
       }
 
-      if (newIndex > index) {
-	index = newIndex;
+      if (newLoc.index > loc.index) {
+	loc = newLoc;
 	tokens.push_back(token);
 	break;
       }

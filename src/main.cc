@@ -1,7 +1,7 @@
+#include "slowjs/lex.h"
+
 #include <iostream>
 #include <vector>
-
-import lex;
 
 int main() {
   std::vector<Token> tokens = {};

@@ -1,5 +1,6 @@
 #include <slowjs/lex.h>
 
+#include <iostream>
 #include <algorithm>
 
 std::string longestMatch(const std::string& source, const uint64_t index, const std::vector<std::string>& options) {
@@ -14,13 +15,13 @@ std::string longestMatch(const std::string& source, const uint64_t index, const 
 	continue;
       }
 
-      if (matchIndex >= options[i].length() ||
+      if (matchIndex > options[i].length() ||
 	  source.substr(index, matchIndex).compare(options[i].substr(0, matchIndex)) != 0) {
 	skipList[i] = true;
 	continue;
       }
 
-      if (matchIndex == options[i].length() - 1 &&
+      if (matchIndex == options[i].length() &&
 	  source.substr(index, matchIndex).compare(options[i]) == 0 &&
 	  matchIndex > match.length()) {
 	match = options[i];
@@ -42,6 +43,10 @@ lexResult lexKeyword(const std::string& source, const Location loc) {
 
   const std::vector<std::string> keywords = {"function", "return"};
   const std::string match = longestMatch(source, loc.index, keywords);
+  if (match.size() == 0) {
+    return {NoError, loc, Token{}};
+  }
+
   return {
 	  NoError,
 	  Location{loc.line, loc.col+match.size(), loc.index+match.size()},
@@ -71,6 +76,10 @@ lexResult lexSymbol(const std::string& source, const Location loc) {
 
   const std::vector<std::string> keywords = {"{", "}", "(", ")", ";", "+"};
   const std::string match = longestMatch(source, loc.index, keywords);
+  if (match.size() == 0) {
+    return {NoError, loc, Token{}};
+  }
+
   return {
 	  NoError,
 	  Location{loc.line, loc.col+match.size(), loc.index+match.size()},
@@ -106,9 +115,9 @@ lexResult lexIdentifier(const std::string& source, const Location loc) {
 
   return {
 	  NoError,
-	  {loc.line, loc.col + i - loc.index, loc.index},
+	  {loc.line, loc.col + i - loc.index, i},
 	  Token{
-		source.substr(loc.index, i),
+		source.substr(loc.index, i - loc.index),
 		IdentifierToken,
 		loc,
 	  },
@@ -121,6 +130,7 @@ Error lex(const std::string& source, std::vector<Token>& tokens) {
   std::vector<lexResult (*)(const std::string&, const Location)> lexers = {lexKeyword, lexSymbol, lexIdentifier};
 
   while (loc.index < source.length()) {
+    std::cout << loc.index << std::endl;
     for (uint64_t i = 0; i < (sizeof lexers / sizeof lexers[0]); i++) {
       auto [error, newLoc, token] = lexers[i](source, loc);
       if (error != NoError) {
@@ -129,8 +139,15 @@ Error lex(const std::string& source, std::vector<Token>& tokens) {
 
       if (newLoc.index > loc.index) {
 	loc = newLoc;
-	tokens.push_back(token);
+	if (token.value != "") {
+	  tokens.push_back(token);
+	  std::cout << "\"" << token.value << "\"" << std::endl;
+	}
 	break;
+      }
+
+      if (i == (sizeof lexers / sizeof lexers[0] - 1)) {
+	return Error{"Unable to lex token", loc};	
       }
     }
   }

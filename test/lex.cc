@@ -9,7 +9,7 @@ TEST(lex, ok) {
   std::vector<Token> tokens = {};
   Error err = lex(source, tokens);
 
-  ASSERT_EQ(err, NoError);
+  ASSERT_EQ(err, NoError) << err.error;
   ASSERT_EQ(expected.size(), tokens.size());
 
   for (unsigned int i = 0; i < expected.size(); i++) {

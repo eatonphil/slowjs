@@ -5,8 +5,15 @@
 #include <string>
 #include <vector>
 
+struct Location {
+  uint64_t line;
+  uint64_t col;
+  uint64_t index;
+};
+
 struct Error {
   std::string error;
+  Location loc;
 };
 
 static bool operator==(const Error& lhs, const Error& rhs) {
@@ -20,12 +27,6 @@ static bool operator!=(const Error& lhs, const Error& rhs) {
 static Error NoError = {};
 
 enum TokenType {IdentifierToken, KeywordToken, SymbolToken};
-
-struct Location {
-  uint64_t line;
-  uint64_t col;
-  uint64_t index;
-};
 
 struct Token {
   std::string value;

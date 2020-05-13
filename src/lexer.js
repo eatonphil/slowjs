@@ -3,26 +3,17 @@ const KEYWORD_TYPE = 'KEYWORD_TYPE';
 const LITERAL_TYPE = 'LITERAL_TYPE';
 const IDENTIFIER_TYPE = 'IDENTIFIER_TYPE';
 const OPERATOR_TYPE = 'OPERATOR_TYPE';
+const STRING_TYPE = 'STRING_TYPE';
+const NUMBER_TYPE = 'NUMBER_TYPE';
 
-function lexLiteral(source, location) {
-  if (location.index >= source.length) {
-    return { ok: false, location: location };
-  }
-}
-
-function lexIdentifier(source, location) {
+function lexTestChars(source, location, type, test) {
   if (location.index >= source.length) {
     return { ok: false, location: location };
   }
 
-  for (let i = location.index; i < source.length; i++) {
-    const c = source[i];
-    const code = source.charCodeAt(i);
-    if ((code >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) ||
-      (code >= 'Z'.charCodeAt(0) && c <= 'Z'.charCodeAt(0)) ||
-      c === '_' ||
-      c === '$' ||
-      (i > location.index && code >= '0'.charCodeAt(0) && code <= '9'.charCodeAt(0))) {
+  let i = location.index;
+  for (; i < source.length; i++) {
+    if (test(i, source, i === location.index)) {
       continue;
     }
 
@@ -42,13 +33,57 @@ function lexIdentifier(source, location) {
     },
     token: {
       value: source.substring(location.index, i - location.index),
-      type: IDENTIFIER_TYPE,
+      type: type,
       location: location,
     },
   };
 }
 
-function longestMatch(source, location, options) {
+function lexNumberTest(i, source) {
+  const code = source.charCodeAt(i);
+  // TODO: floats
+  return code >= '0'.charCodeAt(0) && code <= '9'.charCodeAt(0);
+}
+
+function lexNumber(source, location) {
+  return lexTestChars(source, location, NUMBER_TYPE, lexNumberTest);
+}
+
+function lexStringTest(i, source, first) {
+  // TODO: handle " delimiter
+  if (first && source[i] !== '\'') {
+    return false;
+  }
+
+  return (i < source.length - 1 && source[i - 1] === '\'' && source[i - 2] !== '\\');
+}
+
+function lexString(source, location) {
+  const r = lexTestChars(source, location, STRING_TYPE, lexStringTest);
+  if (!r.ok) {
+    return r;
+  }
+
+  // Trim quotes
+  r.token.value = r.token.value.substring(1, r.token.value.length - 2);
+  return r;
+}
+
+function lexIdentifierTest(i, source, first) {
+  const c = source[i];
+  const code = source.charCodeAt(i);
+  return ((code >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) ||
+    (code >= 'Z'.charCodeAt(0) && c <= 'Z'.charCodeAt(0)) ||
+    c === '_' ||
+    c === '$' ||
+    (!first && code >= '0'.charCodeAt(0) && code <= '9'.charCodeAt(0)));
+}
+
+function lexIdentifier(source, location) {
+  return lexTestChars(source, location, IDENTIFIER_TYPE, lexIdentifierTest);
+}
+
+function longestMatch(source, location, options, type) {
   if (location.index >= source.length || options.length === 0) {
     return "";
   }
@@ -64,11 +99,11 @@ function longestMatch(source, location, options) {
         continue;
       }
 
-      const optionSub = option.substring(0, i - locations.index);
-      const sourceSub = source.substring(locations.index, i - locations.index);
+      const optionSub = option.substring(0, i - location.index);
+      const sourceSub = source.substring(location.index, i - location.index);
       if (optionSub !== sourceSub) {
         skipList.push(option);
-        continue
+        continue;
       }
 
       if (option === sourceSub && option.length > match.length) {
@@ -77,7 +112,24 @@ function longestMatch(source, location, options) {
     }
   }
 
-  return match;
+  if (match === "") {
+    return { ok: false, location: location };
+  }
+
+  const token = {
+    value: match,
+    type: type,
+    location: location,
+  };
+  return {
+    ok: true,
+    location: {
+      line: location.line,
+      col: location.col + match.length,
+      index: location.col + match.length,
+    },
+    token: token
+  };
 }
 
 function lexOperator(source, location) {
@@ -96,17 +148,7 @@ function lexOperator(source, location) {
     '!'
   ];
 
-  const r = longestMatch(source, location, symbols);
-  if (r.match === "") {
-    return { ok: false, location: location };
-  }
-
-  const token = {
-    value: r.match,
-    type: SYMBOL_TOKEN,
-    location: location,
-  };
-  return { ok: true, location: r.location, token: token };
+  return longestMatch(source, location, operators, OPERATOR_TYPE);
 }
 
 function lexSymbol(source, location) {
@@ -122,17 +164,7 @@ function lexSymbol(source, location) {
     ';'
   ];
 
-  const r = longestMatch(source, location, symbols);
-  if (r.match === "") {
-    return { ok: false, location: location };
-  }
-
-  const token = {
-    value: r.match,
-    type: SYMBOL_TOKEN,
-    location: location,
-  };
-  return { ok: true, location: r.location, token: token };
+  return longestMatch(source, location, symbols, SYMBOL_TYPE);
 }
 
 function lexKeyword(source, location) {
@@ -147,29 +179,30 @@ function lexKeyword(source, location) {
     'break'
   ];
 
-  const match = longestMatch(source, location, keywords);
-  if (match === "") {
-    return { ok: false, location: location };
-  }
-
-  const token = {
-    value: r.match,
-    type: KEYWORD_TOKEN,
-    location: location,
-  };
-  return { ok: true, location: r.location, token: token };
+  return longestMatch(source, location, keywords, KEYWORD_TYPE);
 }
 
-function lex(source) {
-  const lexers = [lexKeyword, lexSymbol, lexOperator, lexIdentifier, lexLiteral];
-  for (let i = 0; i < source.length; i++) {
-    for (let l = 0; i < lexers.length; l++) {
-      const r = lexers[l](source, location);
+module.exports.lex = function (source) {
+  let location = { index: 0, col: 0, line: 0 };
+  const tokens = [];
+  const lexers = [lexKeyword, lexSymbol, lexOperator, lexIdentifier, lexNumber, lexString];
+  while (location.index < source.length) {
+    let found = false;
+    for (let i = 0; i < lexers.length; i++) {
+      const r = lexers[i](source, location);
       if (!r.ok) {
         continue;
       }
 
+      tokens.push(r.token);
+      location = r.location;
+      found = true;
+    }
 
+    if (!found) {
+      throw new Error('Unable to lex token near: ' + tokens[tokens.length - 1].value);
     }
   }
+
+  return tokens;
 }
